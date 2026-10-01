@@ -250,9 +250,26 @@ async function createDriverApplication(u,meta){
     vehicle_make:meta.vehicle_make||'',
     vehicle_model:meta.vehicle_model||'',
     vehicle_plate:meta.vehicle_plate||'',
-    vehicle_color:meta.vehicle_color||''
+    vehicle_color:meta.vehicle_color||'',
+    status:'pending'
   };
-  const r=await sb.from('driver_applications').upsert(app,{onConflict:'user_id'});
+
+  const existing=await sb.from('driver_applications')
+    .select('id')
+    .eq('user_id',u.id)
+    .maybeSingle();
+
+  if(existing.error)return {ok:false,message:existing.error.message};
+
+  let r;
+  if(existing.data){
+    r=await sb.from('driver_applications')
+      .update(app)
+      .eq('id',existing.data.id);
+  }else{
+    r=await sb.from('driver_applications').insert(app);
+  }
+
   if(r.error)return {ok:false,message:r.error.message};
   return {ok:true};
 }
@@ -302,22 +319,32 @@ async function applyDriver(){
 
 async function boot(u){
   user=u;
-  const p=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
-  if(p.error)return authMsg(p.error.message);
-  if(!p.data){
-    const m=u.user_metadata||{};
-    const c=await sb.from('profiles').insert({id:u.id,first_name:m.first_name||'',last_name:m.last_name||'',phone:m.phone||'',role:'client'}).select().single();
-    if(c.error)return authMsg(c.error.message);
-    profile=c.data;
-  }else profile=p.data;
+
+  const p=await sb.from('profiles')
+    .select('*')
+    .eq('id',u.id)
+    .maybeSingle();
+
+  if(p.error)return authMsg('Impossible de charger votre profil : '+p.error.message);
+  if(!p.data)return authMsg('Compte authentifié mais profil NZILA introuvable. Vérifiez le trigger Supabase.');
+
+  profile=p.data;
 
   if(profile.role!=='driver'){
-    await finalizeDriverApplication(u);
-    const pending=await sb.from('driver_applications').select('id,status').eq('user_id',u.id).maybeSingle();
+    const finalized=await finalizeDriverApplication(u);
+    if(!finalized.ok)return authMsg(finalized.message);
+
+    const pending=await sb.from('driver_applications')
+      .select('id,status')
+      .eq('user_id',u.id)
+      .maybeSingle();
+
     if(pending.error)return authMsg(pending.error.message);
+
     if(pending.data){
       return authMsg('Candidature reçue. Statut : '+(pending.data.status||'en attente')+'. Attendez la validation NZILA.');
     }
+
     return authMsg('Votre candidature chauffeur n’a pas été trouvée. Contactez NZILA.');
   }
 

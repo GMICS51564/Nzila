@@ -216,6 +216,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
 const SUPABASE_URL='https://dsvbtlwxujuusnarcbfg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G';
 const NZILA_SITE_URL='https://gmics51564.github.io/Nzila/driver/';
+const NZILA_DRIVER_REDIRECT='https://gmics51564.github.io/Nzila/driver/';
 
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
@@ -242,22 +243,61 @@ async function login(){
   await boot(data.user);
 }
 
+async function createDriverApplication(u,meta){
+  const app={
+    user_id:u.id,
+    license_number:meta.license_number||'',
+    vehicle_make:meta.vehicle_make||'',
+    vehicle_model:meta.vehicle_model||'',
+    vehicle_plate:meta.vehicle_plate||'',
+    vehicle_color:meta.vehicle_color||''
+  };
+  const r=await sb.from('driver_applications').upsert(app,{onConflict:'user_id'});
+  if(r.error)return {ok:false,message:r.error.message};
+  return {ok:true};
+}
+
+async function finalizeDriverApplication(u){
+  const m=u.user_metadata||{};
+  return createDriverApplication(u,{
+    license_number:m.license_number,
+    vehicle_make:m.vehicle_make,
+    vehicle_model:m.vehicle_model,
+    vehicle_plate:m.vehicle_plate,
+    vehicle_color:m.vehicle_color
+  });
+}
+
 async function applyDriver(){
   if(!cfg())return authMsg('Configuration Supabase incomplète.');
   const email=document.getElementById('aEmail').value.trim(),password=document.getElementById('aPassword').value;
   if(!email||!password)return authMsg('Email et mot de passe requis.');
-  const meta={first_name:v('aFirst'),last_name:v('aLast'),phone:v('aPhone')};
-  const {data,error}=await sb.auth.signUp({email,password,options:{data:meta,emailRedirectTo:NZILA_SITE_URL}});
-  if(error)return authMsg(error.message);
-  if(!data.user)return authMsg('Vérifiez votre email pour continuer.');
-  const app={
-    user_id:data.user.id,license_number:v('aLicense'),
-    vehicle_make:v('aMake'),vehicle_model:v('aModel'),
-    vehicle_plate:v('aPlate'),vehicle_color:v('aColor')
+  if(password.length<6)return authMsg('Le mot de passe doit contenir au moins 6 caractères.');
+
+  const meta={
+    first_name:v('aFirst'),last_name:v('aLast'),phone:v('aPhone'),
+    license_number:v('aLicense'),vehicle_make:v('aMake'),
+    vehicle_model:v('aModel'),vehicle_plate:v('aPlate'),vehicle_color:v('aColor')
   };
-  const r=await sb.from('driver_applications').insert(app);
-  if(r.error)return authMsg(r.error.message);
-  authMsg('Candidature déposée. Confirmez votre email puis attendez la validation NZILA.');
+
+  authMsg('Création de votre compte chauffeur…');
+
+  const {data,error}=await sb.auth.signUp({
+    email,password,
+    options:{data:meta,emailRedirectTo:NZILA_DRIVER_REDIRECT}
+  });
+
+  if(error)return authMsg(error.message);
+  if(!data.user)return authMsg('Impossible de créer le compte.');
+
+  if(!data.session){
+    authMsg('Compte créé. Consultez votre email et cliquez sur le lien de confirmation. Revenez ensuite ici pour vous connecter.');
+    return;
+  }
+
+  const result=await createDriverApplication(data.user,meta);
+  if(!result.ok)return authMsg(result.message);
+  authMsg('Candidature déposée. Votre profil sera vérifié par NZILA.');
 }
 
 async function boot(u){
@@ -271,7 +311,15 @@ async function boot(u){
     profile=c.data;
   }else profile=p.data;
 
-  if(profile.role!=='driver')return authMsg('Votre compte n’est pas encore validé comme chauffeur.');
+  if(profile.role!=='driver'){
+    await finalizeDriverApplication(u);
+    const pending=await sb.from('driver_applications').select('id,status').eq('user_id',u.id).maybeSingle();
+    if(pending.error)return authMsg(pending.error.message);
+    if(pending.data){
+      return authMsg('Candidature reçue. Statut : '+(pending.data.status||'en attente')+'. Attendez la validation NZILA.');
+    }
+    return authMsg('Votre candidature chauffeur n’a pas été trouvée. Contactez NZILA.');
+  }
 
   const d=await sb.from('driver_profiles').select('*').eq('id',u.id).maybeSingle();
   if(d.error)return authMsg(d.error.message);
@@ -286,8 +334,13 @@ async function boot(u){
 }
 
 sb.auth.onAuthStateChange(async(event,session)=>{
-  if(session&&!user)await boot(session.user);
-  if(!session){user=null;stopGPS();document.getElementById('auth').classList.remove('hidden');document.getElementById('app').classList.add('hidden');}
+  if(session){
+    if(!user)await boot(session.user);
+  }else{
+    user=null;stopGPS();
+    document.getElementById('auth').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+  }
 });
 
 async function toggleOnline(){
@@ -490,7 +543,12 @@ window.addEventListener('DOMContentLoaded',async()=>{
   if(!cfg())return authMsg('Configuration Supabase incomplète.');
   const {data,error}=await sb.auth.getSession();
   if(error)return authMsg(error.message);
-  if(data.session)await boot(data.session.user);else authMode('login');
+  if(data.session){
+    await boot(data.session.user);
+    if(window.location.search||window.location.hash){
+      window.history.replaceState({},document.title,NZILA_DRIVER_REDIRECT);
+    }
+  }else authMode('login');
 });
 </script>
 </body>

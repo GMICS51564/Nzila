@@ -95,11 +95,18 @@ async function submitAuth(){if(!validConfig()){setAuthStatus('Configuration Supa
     data: meta,
     emailRedirectTo: NZILA_SITE_URL
   }
-});if(r.error){setAuthStatus(r.error.message);return}setAuthStatus('Compte créé. Vérifiez votre email puis revenez sur NZILA.');}else{r=await sb.auth.signInWithPassword({email,password});if(r.error){setAuthStatus(r.error.message);return}await boot(r.data.session.user)}}
+});if(r.error){setAuthStatus(r.error.message);return}
+if(r.data?.session){await boot(r.data.user);}
+else{setAuthStatus('Compte créé. Vérifiez votre email puis revenez sur NZILA.');}
+}else{r=await sb.auth.signInWithPassword({email,password});if(r.error){setAuthStatus(r.error.message);return}await boot(r.data.session.user)}}
 function setAuthStatus(t){document.getElementById('authStatus').textContent=t}
 async function boot(u){
   user=u;
-  let {data,error}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
+
+  const {data,error}=await sb.from('profiles')
+    .select('*')
+    .eq('id',u.id)
+    .maybeSingle();
 
   if(error){
     setAuthStatus('Impossible de charger votre profil : '+error.message);
@@ -107,20 +114,8 @@ async function boot(u){
   }
 
   if(!data){
-    const m=u.user_metadata||{};
-    const payload={
-      id:u.id,
-      first_name:m.first_name||'',
-      last_name:m.last_name||'',
-      phone:m.phone||'',
-      department:null
-    };
-    const created=await sb.from('profiles').insert(payload).select().single();
-    if(created.error){
-      setAuthStatus('Compte connecté, mais profil non créé : '+created.error.message);
-      return;
-    }
-    data=created.data;
+    setAuthStatus('Compte authentifié mais profil NZILA introuvable. Le trigger Supabase n’a pas créé le profil.');
+    return;
   }
 
   profile=data;

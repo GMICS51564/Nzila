@@ -60,16 +60,80 @@
 </div>
 <div id="rideModal" class="modal"><div class="sheet"><div class="handle"></div><h3 id="rideModalTitle">Recherche en cours</h3><p id="rideModalText">Nous transmettons votre demande au réseau NZILA.</p><div id="rideBox" class="routebox"></div><button class="primary" id="rideModalBtn" onclick="closeRideModal()">Fermer</button></div></div>
 <div id="toast" class="toast"></div>
+<!-- NZILA — Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const SUPABASE_URL='https://YOUR_PROJECT.supabase.co';const SUPABASE_ANON_KEY='YOUR_SUPABASE_ANON_KEY';
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);let user=null,profile=null,map=null,rideChannel=null,passengers=1,bags=1,mode='now',passengerType='me';
+const SUPABASE_URL = 'https://dsvbtlwxujuusnarcbfg.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G';
+const NZILA_SITE_URL = 'https://gmics51564.github.io/Nzila/';
+
+const sb = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+);let user=null,profile=null,map=null,rideChannel=null,passengers=1,bags=1,mode='now',passengerType='me';
 const coords={Bouenza:[-4.1536,13.55],Brazzaville:[-4.2634,15.2429],'Congo-Oubangui':[-1.64,16.05],Cuvette:[-.48,15.9],'Cuvette-Ouest':[.85,14.8],'Djoué-Léfini':[-2,15.7],Kouilou:[-4.3,11.75],Lékoumou:[-3.68,13.35],Likouala:[1.63,18.06],Niari:[-4.2,12.67],'Nkéni-Alima':[-1.95,15.2],Plateaux:[-2.55,14.75],'Pointe-Noire':[-4.7692,11.8664],Pool:[-3.38,14.7],Sangha:[1.62,16.05]};
-function validConfig(){return !SUPABASE_URL.includes('YOUR_PROJECT')&&!SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')}
+function validConfig(){
+  return Boolean(
+    SUPABASE_URL &&
+    SUPABASE_PUBLISHABLE_KEY &&
+    SUPABASE_URL.startsWith('https://') &&
+    !SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')
+  );
+}
 function authMode(m){document.getElementById('loginTab').classList.toggle('active',m==='login');document.getElementById('signupTab').classList.toggle('active',m==='signup');document.getElementById('signupFields').classList.toggle('hidden',m!=='signup');document.getElementById('authBtn').textContent=m==='login'?'Se connecter':'Créer mon compte';document.getElementById('authBtn').dataset.mode=m}
-async function submitAuth(){if(!validConfig()){setAuthStatus('Configure d’abord SUPABASE_URL et SUPABASE_ANON_KEY dans le fichier.');return}const mode=document.getElementById('authBtn').dataset.mode||'login',email=document.getElementById('email').value.trim(),password=document.getElementById('password').value;if(!email||!password){setAuthStatus('Email et mot de passe requis.');return}setAuthStatus('Connexion…');let r;if(mode==='signup'){const meta={first_name:document.getElementById('firstName').value.trim(),last_name:document.getElementById('lastName').value.trim(),phone:document.getElementById('phone').value.trim()};r=await sb.auth.signUp({email,password,options:{data:meta,emailRedirectTo:location.href}});if(r.error){setAuthStatus(r.error.message);return}setAuthStatus('Compte créé. Vérifiez votre email puis revenez sur NZILA.');}else{r=await sb.auth.signInWithPassword({email,password});if(r.error){setAuthStatus(r.error.message);return}await boot(r.data.session.user)}}
+async function submitAuth(){if(!validConfig()){setAuthStatus('Configuration Supabase incomplète dans le fichier.');return}const mode=document.getElementById('authBtn').dataset.mode||'login',email=document.getElementById('email').value.trim(),password=document.getElementById('password').value;if(!email||!password){setAuthStatus('Email et mot de passe requis.');return}setAuthStatus('Connexion…');let r;if(mode==='signup'){const meta={first_name:document.getElementById('firstName').value.trim(),last_name:document.getElementById('lastName').value.trim(),phone:document.getElementById('phone').value.trim()};r=await sb.auth.signUp({
+  email,
+  password,
+  options:{
+    data: meta,
+    emailRedirectTo: NZILA_SITE_URL
+  }
+});if(r.error){setAuthStatus(r.error.message);return}setAuthStatus('Compte créé. Vérifiez votre email puis revenez sur NZILA.');}else{r=await sb.auth.signInWithPassword({email,password});if(r.error){setAuthStatus(r.error.message);return}await boot(r.data.session.user)}}
 function setAuthStatus(t){document.getElementById('authStatus').textContent=t}
-async function boot(u){user=u;const {data,error}=await sb.from('profiles').select('*').eq('id',u.id).single();if(error){setAuthStatus(error.message);return}profile=data;document.getElementById('auth').style.display='none';document.getElementById('app').style.display='block';updateProfile();initMap();loadAll();subscribeRides();}
+async function boot(u){
+  user=u;
+  let {data,error}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
+
+  if(error){
+    setAuthStatus('Impossible de charger votre profil : '+error.message);
+    return;
+  }
+
+  if(!data){
+    const m=u.user_metadata||{};
+    const payload={
+      id:u.id,
+      first_name:m.first_name||'',
+      last_name:m.last_name||'',
+      phone:m.phone||'',
+      department:null
+    };
+    const created=await sb.from('profiles').insert(payload).select().single();
+    if(created.error){
+      setAuthStatus('Compte connecté, mais profil non créé : '+created.error.message);
+      return;
+    }
+    data=created.data;
+  }
+
+  profile=data;
+  document.getElementById('auth').style.display='none';
+  document.getElementById('app').style.display='block';
+  updateProfile();
+  initMap();
+  loadHistory();
+  loadPeople();
+  loadFavorites();
+  loadNotifications();
+  subscribeRides();
+}
 sb.auth.onAuthStateChange(async(event,session)=>{if(session&&!user) await boot(session.user);if(!session){user=null;document.getElementById('auth').style.display='grid';document.getElementById('app').style.display='none'}});
 function updateProfile(){const n=((profile.first_name||'')+' '+(profile.last_name||'')).trim()||'Client NZILA';document.getElementById('profileName').textContent=n;document.getElementById('profilePhoneText').textContent=profile.phone||'Client NZILA';document.getElementById('avatar').textContent=((profile.first_name||'N')[0]+(profile.last_name||'Z')[0]).toUpperCase();document.getElementById('pFirst').value=profile.first_name||'';document.getElementById('pLast').value=profile.last_name||'';document.getElementById('pPhone').value=profile.phone||'';document.getElementById('pDept').value=profile.department||''}
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView(coords.Brazzaville,10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);setTimeout(()=>map.invalidateSize(),300)}function departmentChanged(){const d=document.getElementById('department').value;if(d&&coords[d]){map.flyTo(coords[d],10,{duration:1});toast('Carte centrée sur '+d)}}
@@ -80,7 +144,7 @@ function setPassengerType(t){passengerType=t;document.getElementById('meBtn').cl
 function changePassengers(d){passengers=Math.max(1,Math.min(8,passengers+d));document.getElementById('passengerCount').textContent=passengers}function bag(b,v){bags=v;document.querySelectorAll('.bag').forEach(x=>x.classList.remove('active'));b.classList.add('active')}
 function price(){return 1000+Math.max(0,passengers-1)*300+Math.max(0,bags-1)*150+(mode==='schedule'?100:0)}
 async function createRide(){if(!user){return}const department=document.getElementById('department').value,pickup=document.getElementById('pickup').value.trim(),destination=document.getElementById('destination').value.trim();if(!department||!pickup||!destination){toast('Département, départ et destination sont requis.');return}if(mode==='schedule'&&(!document.getElementById('rideDate').value||!document.getElementById('rideTime').value)){toast('Choisissez une date et une heure.');return}const scheduled=mode==='schedule'?new Date(document.getElementById('rideDate').value+'T'+document.getElementById('rideTime').value).toISOString():null;const payload={user_id:user.id,passenger_type:passengerType,passenger_name:passengerType==='other'?document.getElementById('otherName').value.trim():profile.first_name+' '+profile.last_name,passenger_phone:passengerType==='other'?document.getElementById('otherPhone').value.trim():profile.phone,department,city:document.getElementById('city').value.trim(),neighborhood:document.getElementById('neighborhood').value.trim(),pickup_address:pickup,destination_address:destination,passengers_count:passengers,baggage_count:bags,scheduled_at:scheduled,status:'searching',estimated_price:price()};const {data,error}=await sb.from('rides').insert(payload).select().single();if(error){toast(error.message);return}showRideModal(data);subscribeToRide(data.id)}
-function showRideModal(r){document.getElementById('rideModalTitle').textContent='Recherche d’un chauffeur';document.getElementById('rideModalText').textContent='Votre demande est maintenant dans le réseau NZILA.';document.getElementById('rideBox').innerHTML='<strong>'+r.pickup_address+' → '+r.destination_address+'</strong><br><span class="muted">Statut : '+labelStatus(r.status)+' · Estimation : '+r.estimated_price.toLocaleString('fr-FR')+' FCFA</span>';document.getElementById('rideModal').classList.add('show')}
+function showRideModal(r){document.getElementById('rideModalTitle').textContent='Recherche d’un chauffeur';document.getElementById('rideModalText').textContent='Votre demande est maintenant dans le réseau NZILA.';document.getElementById('rideBox').innerHTML='<strong>'+r.pickup_address+' → '+r.destination_address+'</strong><br><span class="muted">Statut : '+labelStatus(r.status)+' · Estimation : '+Number(r.estimated_price||0).toLocaleString('fr-FR')+' FCFA</span>';document.getElementById('rideModal').classList.add('show')}
 function closeRideModal(){document.getElementById('rideModal').classList.remove('show')}
 function labelStatus(s){return ({requested:'Demande créée',searching:'Recherche',accepted:'Chauffeur trouvé',driver_arriving:'Chauffeur en route',arrived:'Chauffeur arrivé',in_progress:'Course en cours',completed:'Terminée',cancelled:'Annulée'})[s]||s}
 function subscribeRides(){if(!user)return;rideChannel=sb.channel('client-rides-'+user.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'user_id=eq.'+user.id},p=>{if(p.new.status==='completed'){toast('Votre course est terminée.');loadHistory()}else{const box=document.getElementById('rideBox');if(box)box.innerHTML='<strong>'+p.new.pickup_address+' → '+p.new.destination_address+'</strong><br><span class="muted">Statut : '+labelStatus(p.new.status)+'</span>'}}).subscribe()}
@@ -102,5 +166,22 @@ function service(n,i){document.getElementById('serviceTitle').textContent=n;docu
 function sendMessage(){const i=document.getElementById('msg'),v=i.value.trim();if(!v)return;const d=document.createElement('div');d.style='background:#123c68;color:#fff;padding:11px;border-radius:14px;font-size:11px;margin:9px 0 9px 25px';d.textContent=v;document.getElementById('msgs').appendChild(d);i.value='';toast('Message envoyé dans le prototype. La conversation Supabase sera activée avec le support.')}
 async function logout(){await sb.auth.signOut()}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}let tt;function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2800)}
-window.addEventListener('DOMContentLoaded',async()=>{const {data}=await sb.auth.getSession();if(data.session)boot(data.session.user);else if(!validConfig())setAuthStatus('Mode préparation : renseigne les clés Supabase dans le fichier.')});
+window.addEventListener('DOMContentLoaded',async()=>{
+  if(!validConfig()){
+    setAuthStatus('Configuration Supabase incomplète.');
+    return;
+  }
+
+  const {data,error}=await sb.auth.getSession();
+  if(error){
+    setAuthStatus(error.message);
+    return;
+  }
+
+  if(data.session){
+    await boot(data.session.user);
+  }else{
+    authMode('login');
+  }
+});
 </script></body></html>

@@ -1,9 +1,126 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NZILA DRIVER — V3</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NZILA DRIVER — V3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
 *{box-sizing:border-box}body{margin:0;background:#06100d;color:#f6fbf8;font-family:Inter,Arial,sans-serif}.wrap{max-width:1150px;margin:auto;padding:20px}.card{background:#0d1b17;border:1px solid #1d342c;border-radius:22px;padding:20px;margin-bottom:16px}.brand{font-size:30px;font-weight:900}.muted{color:#8fa59d}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}input,select,textarea{width:100%;padding:13px;background:#09130f;border:1px solid #294238;color:white;border-radius:13px;margin:5px 0 10px}.btn{padding:13px 16px;border-radius:13px;font-weight:800}.primary{background:#39d391;color:#062117}.ghost{background:#20332c;color:white}.danger{background:#c94b4b;color:white}.hidden{display:none}.pill{display:inline-block;padding:7px 11px;border-radius:999px;background:#17382c;color:#6ce1ac;font-size:12px;font-weight:900}.dangerPill{background:#4b1c1c;color:#ff9d9d}.price{font-size:30px;font-weight:900}.offer{border:1px solid #3c755d;border-radius:18px;padding:18px;background:#10261e}.ride{border:1px solid #254338;border-radius:16px;padding:15px;margin:10px 0}#map{height:420px;border-radius:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}@media(max-width:760px){.grid,.grid3{grid-template-columns:1fr}.wrap{padding:12px}}
-</style></head><body><main class="wrap"><section id="auth" class="card" style="max-width:620px;margin:5vh auto"><div class="brand">NZILA DRIVER</div><p class="muted">Votre numéro +242 est votre identifiant chauffeur.</p><input id="sFirst" placeholder="Prénom"><input id="sLast" placeholder="Nom"><input id="sPhone" placeholder="+242 Votre numéro de téléphone"><input id="sPass" type="password" placeholder="Mot de passe"><input id="license" placeholder="Numéro de permis"><div class="grid"><input id="make" placeholder="Marque du véhicule"><input id="model" placeholder="Modèle"></div><div class="grid"><input id="plate" placeholder="Plaque"><input id="color" placeholder="Couleur"></div><button class="btn primary" style="width:100%" onclick="signup()">Déposer ma candidature</button><hr><h3>Connexion</h3><input id="lPhone" placeholder="+242 Votre numéro de téléphone"><input id="lPass" type="password" placeholder="Mot de passe"><button class="btn ghost" style="width:100%" onclick="login()">Se connecter</button><p id="authMsg" class="muted"></p></section>
-<section id="app" class="hidden"><div class="card"><div class="brand">NZILA DRIVER <span id="verify" class="pill">—</span></div><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span id="hello" class="muted"></span><button class="btn ghost" onclick="logout()">Déconnexion</button></div></div><div class="tabs"><button class="btn primary" onclick="page('cockpit')">Cockpit</button><button class="btn ghost" onclick="page('courses')">Courses</button><button class="btn ghost" onclick="page('mapPage')">GPS</button><button class="btn ghost" onclick="page('finance')">Revenus</button><button class="btn ghost" onclick="page('profile')">Profil</button></div>
-<section id="cockpit"><div class="grid"><div class="card"><span id="onlinePill" class="pill">HORS LIGNE</span><h2>Disponibilité</h2><p id="onlineText" class="muted"></p><button id="onlineBtn" class="btn primary" style="width:100%" onclick="toggleOnline()">Passer en ligne</button></div><div class="card"><h2>Course active</h2><div id="active">Aucune course active.</div></div></div><div id="offer" class="offer hidden"><h2>🚗 Nouvelle course</h2><div id="offerText"></div><div class="grid"><button class="btn primary" onclick="acceptOffer()">Accepter</button><button class="btn ghost" onclick="refuseOffer()">Refuser</button></div></div></section>
-<section id="courses" class="hidden"><div class="card"><h2>Historique des courses</h2><div id="rideList"></div></div></section><section id="mapPage" class="hidden"><div class="card"><h2>GPS temps réel</h2><div id="map"></div><p id="gpsText" class="muted">GPS inactif</p></div></section><section id="finance" class="hidden"><div class="grid"><div class="card"><h2>Solde</h2><div id="balance" class="price">0 FCFA</div></div><div class="card"><h2>Retrait</h2><select id="withdrawProvider"><option value="mtn">MTN Mobile Money</option><option value="airtel">Airtel Money</option></select><input id="withdrawPhone" placeholder="Numéro Mobile Money"><input id="withdrawAmount" type="number" placeholder="Montant FCFA"><button class="btn primary" onclick="withdraw()">Demander un retrait</button></div></div></section><section id="profile" class="hidden"><div class="card"><h2>Profil chauffeur</h2><div id="profileBox"></div><button class="btn danger" style="width:100%" onclick="sos()">🆘 SOS NZILA</button><textarea id="incident" placeholder="Décrire un incident"></textarea><button class="btn ghost" onclick="incidentReport()">Signaler un incident</button></div></section></section></main>
+</style></head>
+<body>
+<main class="wrap">
+<section id="auth" class="card" style="max-width:620px;margin:5vh auto">
+<div class="brand">NZILA DRIVER</div>
+<p class="muted">Votre numéro +242 est votre identifiant chauffeur.</p>
+<input id="sFirst" placeholder="Prénom">
+<input id="sLast" placeholder="Nom">
+<input id="sPhone" placeholder="+242 Votre numéro de téléphone">
+<input id="sPass" type="password" placeholder="Mot de passe">
+<input id="license" placeholder="Numéro de permis">
+<div class="grid">
+<input id="make" placeholder="Marque du véhicule">
+<input id="model" placeholder="Modèle">
+</div>
+<div class="grid">
+<input id="plate" placeholder="Plaque">
+<input id="color" placeholder="Couleur">
+</div>
+<button class="btn primary" style="width:100%" onclick="signup()">Déposer ma candidature</button>
+<hr>
+<h3>Connexion</h3>
+<input id="lPhone" placeholder="+242 Votre numéro de téléphone">
+<input id="lPass" type="password" placeholder="Mot de passe">
+<button class="btn ghost" style="width:100%" onclick="login()">Se connecter</button>
+<p id="authMsg" class="muted">
+</p>
+</section>
+<section id="app" class="hidden">
+<div class="card">
+<div class="brand">NZILA DRIVER <span id="verify" class="pill">—</span>
+</div>
+<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+<span id="hello" class="muted">
+</span>
+<button class="btn ghost" onclick="logout()">Déconnexion</button>
+</div>
+</div>
+<div class="tabs">
+<button class="btn primary" onclick="page('cockpit')">Cockpit</button>
+<button class="btn ghost" onclick="page('courses')">Courses</button>
+<button class="btn ghost" onclick="page('mapPage')">GPS</button>
+<button class="btn ghost" onclick="page('finance')">Revenus</button>
+<button class="btn ghost" onclick="page('profile')">Profil</button>
+</div>
+<section id="cockpit">
+<div class="grid">
+<div class="card">
+<span id="onlinePill" class="pill">HORS LIGNE</span>
+<h2>Disponibilité</h2>
+<p id="onlineText" class="muted">
+</p>
+<button id="onlineBtn" class="btn primary" style="width:100%" onclick="toggleOnline()">Passer en ligne</button>
+</div>
+<div class="card">
+<h2>Course active</h2>
+<div id="active">Aucune course active.</div>
+</div>
+</div>
+<div id="offer" class="offer hidden">
+<h2>🚗 Nouvelle course</h2>
+<div id="offerText">
+</div>
+<div class="grid">
+<button class="btn primary" onclick="acceptOffer()">Accepter</button>
+<button class="btn ghost" onclick="refuseOffer()">Refuser</button>
+</div>
+</div>
+</section>
+<section id="courses" class="hidden">
+<div class="card">
+<h2>Historique des courses</h2>
+<div id="rideList">
+</div>
+</div>
+</section>
+<section id="mapPage" class="hidden">
+<div class="card">
+<h2>GPS temps réel</h2>
+<div id="map">
+</div>
+<p id="gpsText" class="muted">GPS inactif</p>
+</div>
+</section>
+<section id="finance" class="hidden">
+<div class="grid">
+<div class="card">
+<h2>Solde</h2>
+<div id="balance" class="price">0 FCFA</div>
+</div>
+<div class="card">
+<h2>Retrait</h2>
+<select id="withdrawProvider">
+<option value="mtn">MTN Mobile Money</option>
+<option value="airtel">Airtel Money</option>
+</select>
+<input id="withdrawPhone" placeholder="Numéro Mobile Money">
+<input id="withdrawAmount" type="number" placeholder="Montant FCFA">
+<button class="btn primary" onclick="withdraw()">Demander un retrait</button>
+</div>
+</div>
+</section>
+<section id="profile" class="hidden">
+<div class="card">
+<h2>Profil chauffeur</h2>
+<div id="profileBox">
+</div>
+<button class="btn danger" style="width:100%" onclick="sos()">🆘 SOS NZILA</button>
+<textarea id="incident" placeholder="Décrire un incident">
+</textarea>
+<button class="btn ghost" onclick="incidentReport()">Signaler un incident</button>
+</div>
+</section>
+</section>
+</main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const URL='https://dsvbtlwxujuusnarcbfg.supabase.co',KEY='sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G',sb=window.supabase.createClient(URL,KEY);const SK='nzila_driver_v3';let session=JSON.parse(localStorage.getItem(SK)||'null'),online=false,gpsWatch=null,map,marker,offer=null,offerSub,rideSub,activeRide=null;
 const $=id=>document.getElementById(id);function normPhone(v){let x=(v||'').replace(/\s+/g,'');if(/^0\d{9}$/.test(x))x='+242'+x.slice(1);if(/^242\d{9}$/.test(x))x='+'+x;return x}function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function money(v){return Number(v||0).toLocaleString('fr-FR')+' FCFA'}async function rpc(n,a){const r=await sb.rpc(n,a);if(r.error)throw r.error;return r.data}function setSession(x){session=x;localStorage.setItem(SK,JSON.stringify(x))}function logout(){stopGPS();localStorage.removeItem(SK);location.reload()}
@@ -18,4 +135,5 @@ function renderActive(){if(!activeRide){$('active').innerHTML='Aucune course act
 async function changeStatus(s){try{activeRide=await rpc('update_ride_status_v3',{p_ride_id:activeRide.id,p_driver_id:session.id,p_status:s,p_client_code:$('clientCode')?.value||null});renderActive();if(s==='completed')loadBalance()}catch(e){alert(e.message)}}function subscribeRide(){if(rideSub)sb.removeChannel(rideSub);rideSub=sb.channel('driver-ride-'+activeRide.id).on('postgres_changes',{event:'*',schema:'public',table:'rides',filter:'id=eq.'+activeRide.id},p=>{if(p.new){activeRide=p.new;renderActive()}}).subscribe()}
 async function loadRides(){const r=await sb.from('rides').select('*').eq('driver_id',session.id).order('created_at',{ascending:false}).limit(50);$('rideList').innerHTML=r.data?.length?r.data.map(x=>`<div class="ride"><b>${esc(x.status)}</b><br>${esc(x.pickup_address)} → ${esc(x.destination_address)}<br>${money(x.final_price??x.estimated_price)}</div>`).join(''):'Aucune course.'}async function loadBalance(){const r=await sb.from('wallets').select('balance').eq('user_id',session.id).maybeSingle();$('balance').textContent=money(r.data?.balance)}async function withdraw(){try{const id=await rpc('request_withdrawal',{p_driver_id:session.id,p_amount:Number($('withdrawAmount').value),p_provider:$('withdrawProvider').value,p_phone:normPhone($('withdrawPhone').value)});alert('Demande de retrait enregistrée : '+id);loadBalance()}catch(e){alert(e.message)}}function renderProfile(){$('profileBox').innerHTML=`<p><b>${esc(session.first_name)} ${esc(session.last_name)}</b></p><p>${esc(session.phone)}</p><p>Statut : ${esc(session.driver_status||'pending')}</p>`}async function sos(){try{const p=await new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(ok,no,{enableHighAccuracy:true,timeout:5000}):no());const id=await rpc('trigger_driver_sos_v3',{p_driver_id:session.id,p_ride_id:activeRide?.id||null,p_lat:p.coords.latitude,p_lng:p.coords.longitude,p_message:'SOS déclenché depuis l’application chauffeur'});alert('SOS enregistré : '+id)}catch(e){alert('SOS : '+e.message)}}async function incidentReport(){const t=$('incident').value.trim();if(!t)return alert('Décris l’incident.');const r=await sb.from('ride_incidents').insert({ride_id:activeRide?.id||null,reporter_id:session.id,type:'driver_report',description:t});alert(r.error?r.error.message:'Incident transmis à NZILA.');$('incident').value=''}
 window.addEventListener('load',async()=>{if(!session)return;$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('hello').textContent='Bonjour '+session.first_name+' 👋';$('verify').textContent=session.driver_status||'pending';map=L.map('map').setView([-4.2634,15.2429],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);const p=await sb.from('driver_profiles').select('*').eq('id',session.id).maybeSingle();online=!!p.data?.online;renderOnline();if(online){startGPS();watchOffers()}const ar=await sb.from('rides').select('*').eq('driver_id',session.id).in('status',['accepted','driver_arriving','arrived','in_progress']).order('created_at',{ascending:false}).limit(1);activeRide=ar.data?.[0]||null;renderActive();if(activeRide)subscribeRide();loadBalance()});
-</script></body></html>
+</script></body>
+</html>

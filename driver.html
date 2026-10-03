@@ -58,7 +58,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
     <div id="loginForm">
       <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
         <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
-        <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+        <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro de téléphone" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
       </div>
       <input id="password" class="input" type="password" placeholder="Mot de passe" style="margin-top:8px">
       <button class="primary" style="margin-top:12px" onclick="login()">Entrer dans le cockpit</button>
@@ -67,7 +67,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
     <div id="applyForm" class="hidden">
       <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
   <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
-  <input id="aEmail" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+  <input id="aEmail" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro de téléphone" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
 </div>
       <input id="aPassword" class="input" type="password" placeholder="Mot de passe" style="margin-top:8px">
       <div class="grid">
@@ -239,6 +239,12 @@ function authMode(mode){
 }
 function authMsg(t){document.getElementById('authMsg').textContent=t}
 
+// NZILA : "Votre numéro" EST le numéro de téléphone et l'identifiant du compte chauffeur.
+
+function nzilaCanonicalPhone(value){
+  return normalizeNzilaPhone(value || '');
+}
+
 function normalizeNzilaPhone(raw){
   let digits=(raw||'').replace(/\D/g,'');
   if(digits.startsWith('242')) digits=digits.slice(3);
@@ -249,18 +255,20 @@ function normalizeNzilaPhone(raw){
 function nzilaDriverAccounts(){try{return JSON.parse(localStorage.getItem('nzila_driver_accounts')||'[]')}catch(e){return []}}
 function saveNzilaDriverAccounts(a){localStorage.setItem('nzila_driver_accounts',JSON.stringify(a))}
 async function login(){
-  const phone=normalizeNzilaPhone(document.getElementById('email').value),password=document.getElementById('password').value;
+  const phone=normalizeNzilaPhone(document.getElementById('email').value);
+  const password=document.getElementById('password').value;
   if(!phone||!password)return authMsg('Numéro de téléphone et mot de passe requis.');
-  const a=nzilaDriverAccounts().find(a=>a.phone===phone&&a.password===password);
+  const a=nzilaDriverAccounts().find(a=>nzilaCanonicalPhone(a.phone)===phone&&a.password===password);
   if(!a)return authMsg('Numéro ou mot de passe incorrect.');
   const u={...a};delete u.password;localStorage.setItem('nzila_driver_session',JSON.stringify(u));await boot(u);
 }
 async function applyDriver(){
-  const phone=normalizeNzilaPhone(document.getElementById('aEmail').value),password=document.getElementById('aPassword').value;
+  const phone=normalizeNzilaPhone(document.getElementById('aEmail').value);
+  const password=document.getElementById('aPassword').value;
   if(!phone||!password)return authMsg('Numéro de téléphone et mot de passe requis.');
   if(password.length<6)return authMsg('Le mot de passe doit contenir au moins 6 caractères.');
   const accounts=nzilaDriverAccounts();
-  if(accounts.some(a=>a.phone===phone))return authMsg('Ce numéro est déjà utilisé pour un compte chauffeur.');
+  if(accounts.some(a=>nzilaCanonicalPhone(a.phone)===phone))return authMsg('Ce numéro est déjà utilisé pour un compte chauffeur.');
   const u={id:'local-driver-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),phone,first_name:v('aFirst'),last_name:v('aLast'),license_number:v('aLicense'),vehicle_make:v('aMake'),vehicle_model:v('aModel'),vehicle_plate:v('aPlate'),vehicle_color:v('aColor'),role:'driver',verification_status:'pending',created_at:new Date().toISOString()};
   accounts.push({...u,password});
   saveNzilaDriverAccounts(accounts);

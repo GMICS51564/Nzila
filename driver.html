@@ -268,12 +268,7 @@ async function boot(u){
   document.getElementById('auth').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
   renderProfile();renderOnline();initMap();loadDashboard();loadMyRides();loadWallet();loadDocuments();loadNotifications();subscribe();
 }
-sb.auth.onAuthStateChange(()=>{});}else{
-    user=null;stopGPS();
-    document.getElementById('auth').classList.remove('hidden');
-    document.getElementById('app').classList.add('hidden');
-  }
-});
+sb.auth.onAuthStateChange(()=>{});
 
 async function toggleOnline(){
   const next=!online;

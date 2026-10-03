@@ -261,14 +261,22 @@
   <button class="nav active" data-page="home" onclick="openPage('home')"><div>⌂</div>Accueil</button>
   <button class="nav" data-page="rides" onclick="openPage('rides')"><div>🚕</div>Courses</button>
   <button class="nav" data-page="earnings" onclick="openPage('earnings')"><div>💰</div>Revenus</button>
-  <button class="nav" data-page="profile" onclick="openPage('profile')"><div>●</div>Profil</button>
+  <button class="nav" data-page="profile" onclick="openPage('profile')"><div>●</div>Profil</button><button class="nav" data-page="driverPlus" onclick="openPage('driverPlus')"><div>＋</div>Plus</button>
 </nav>
 </section>
 
+<section class="page" id="driverPlusPage">
+ <div class="top"><div><div class="eyebrow">NZILA CHAUFFEUR</div><h1>Centre chauffeur</h1><p class="muted">Outils supplémentaires sans modifier votre espace actuel.</p></div></div>
+ <div class="gridPlus"><div class="card actionCard" onclick="openPage('driverStats')"><div class="itemicon">📊</div><h3>Tableau de bord</h3><p class="muted">Performances réelles et activité.</p></div><div class="card actionCard" onclick="openPage('vehicleCheck')"><div class="itemicon">🚗</div><h3>Véhicule</h3><p class="muted">Checklist et état du véhicule.</p></div><div class="card actionCard" onclick="openPage('driverSecurity')"><div class="itemicon">🛡️</div><h3>Sécurité</h3><p class="muted">GPS, SOS et incidents.</p></div><div class="card actionCard" onclick="openPage('driverActivity')"><div class="itemicon">🧾</div><h3>Journal</h3><p class="muted">Dernières courses et paiements.</p></div></div>
+</section>
+<section class="page" id="driverStatsPage"><div class="top"><button class="btn" onclick="openPage('driverPlus')">← Retour</button><div><div class="eyebrow">PERFORMANCE</div><h1>Tableau de bord</h1></div></div><div class="gridPlus"><div class="card"><small>Courses</small><h2 id="plusRideCount">—</h2></div><div class="card"><small>Chiffre d'affaires</small><h2 id="plusRevenue">—</h2></div><div class="card"><small>Solde</small><h2 id="plusBalance">—</h2></div><div class="card"><small>Note</small><h2 id="plusRating">—</h2></div></div><div class="card"><h3>Actualiser</h3><button class="btn primary wide" onclick="loadDriverPlusStats()">Synchroniser</button></div></section>
+<section class="page" id="vehicleCheckPage"><div class="top"><button class="btn" onclick="openPage('driverPlus')">← Retour</button><div><div class="eyebrow">VÉHICULE</div><h1>Checklist</h1></div></div><div class="card"><label class="item"><span>🛞 Pneus vérifiés</span><input id="chkTires" type="checkbox"></label><label class="item"><span>💡 Feux vérifiés</span><input id="chkLights" type="checkbox"></label><label class="item"><span>🧯 Équipement de sécurité</span><input id="chkSafety" type="checkbox"></label><label class="item"><span>📄 Documents disponibles</span><input id="chkDocs" type="checkbox"></label><button class="btn primary wide" onclick="saveVehicleCheck()">Enregistrer la checklist</button></div><div class="card"><h3>Note entretien</h3><textarea id="vehicleNote" class="input" style="height:100px;padding-top:12px" placeholder="Entretien à prévoir..."></textarea><button class="btn wide" onclick="saveVehicleNote()">Enregistrer</button></div></section>
+<section class="page" id="driverSecurityPage"><div class="top"><button class="btn" onclick="openPage('driverPlus')">← Retour</button><div><div class="eyebrow">PROTECTION</div><h1>Sécurité chauffeur</h1></div></div><div class="card"><h3>État GPS</h3><p id="driverGpsState" class="muted">Vérification en cours.</p><button class="btn wide" onclick="checkDriverGps()">Tester le GPS</button></div><div class="card"><h3>Urgence</h3><button class="btn danger wide" onclick="showSOS()">🆘 SOS chauffeur</button></div></section>
+<section class="page" id="driverActivityPage"><div class="top"><button class="btn" onclick="openPage('driverPlus')">← Retour</button><div><div class="eyebrow">JOURNAL</div><h1>Activité chauffeur</h1></div></div><div class="card"><div id="driverPlusActivity" class="list"></div></div></section>
 <div id="modal" class="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
 <div id="toast" class="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>.gridPlus{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.gridPlus{grid-template-columns:1fr}}.actionCard{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.actionCard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const SUPABASE_URL='https://dsvbtlwxujuusnarcbfg.supabase.co';
@@ -506,6 +514,15 @@ function nzdWireButtons(){
 }
 setTimeout(nzdRestore,0);setTimeout(nzdWireButtons,100);
 
+</script>
+<script>
+async function loadDriverPlusStats(){if(!current?.id)return;const p=await sb.from('driver_profiles').select('*').eq('id',current.id).maybeSingle();const w=await sb.from('nzila_driver_wallet_summary').select('*').eq('driver_id',current.id).maybeSingle();if(p.data){$('plusRideCount').textContent=p.data.total_rides||0;$('plusRevenue').textContent=money(p.data.total_revenue||0);$('plusRating').textContent=Number(p.data.rating||5).toFixed(2)+' ★'}$('plusBalance').textContent=money(w.data?.balance||0);}
+function saveVehicleCheck(){const x={tires:$('chkTires').checked,lights:$('chkLights').checked,safety:$('chkSafety').checked,docs:$('chkDocs').checked};localStorage.setItem('nzila_vehicle_check',JSON.stringify(x));toast('Checklist enregistrée.')}
+function saveVehicleNote(){localStorage.setItem('nzila_vehicle_note',$('vehicleNote').value);toast('Note enregistrée.')}
+function loadVehicleCheck(){try{const x=JSON.parse(localStorage.getItem('nzila_vehicle_check')||'{}');['tires','lights','safety','docs'].forEach(k=>{if(x[k]!==undefined)$('chk'+k[0].toUpperCase()+k.slice(1)).checked=x[k]});$('vehicleNote').value=localStorage.getItem('nzila_vehicle_note')||''}catch{}}
+async function checkDriverGps(){if(!navigator.geolocation)return $('driverGpsState').textContent='GPS indisponible';navigator.geolocation.getCurrentPosition(p=>{$('driverGpsState').textContent='GPS OK · '+p.coords.latitude.toFixed(5)+', '+p.coords.longitude.toFixed(5)},e=>$('driverGpsState').textContent='Erreur GPS : '+e.message,{enableHighAccuracy:true,timeout:8000})}
+async function loadDriverPlusActivity(){if(!current?.id)return;const r=await sb.from('rides').select('*').eq('driver_id',current.id).order('created_at',{ascending:false}).limit(30);$('driverPlusActivity').innerHTML=r.data?.length?r.data.map(x=>'<div class="listItem"><div><b>#'+String(x.id).slice(0,8)+'</b><small>'+esc(x.pickup_address||'')+' → '+esc(x.destination_address||'')+'</small></div><span>'+money(x.final_price||x.estimated_price||0)+'</span></div>').join(''):'<p class="muted">Aucune course.</p>'}
+const _openPageDriver=openPage;openPage=function(p){_openPageDriver(p);if(p==='driverStats')loadDriverPlusStats();if(p==='vehicleCheck')loadVehicleCheck();if(p==='driverSecurity')checkDriverGps();if(p==='driverActivity')loadDriverPlusActivity()};
 </script>
 </body>
 </html>

@@ -20,7 +20,7 @@
     <div id="signupFields" class="hidden">
       <input id="firstName" class="input" placeholder="Prénom" style="margin-bottom:9px"><input id="lastName" class="input" placeholder="Nom" style="margin-bottom:9px"><input id="phone" class="input" placeholder="Téléphone" style="margin-bottom:9px">
     </div>
-    <input id="email" class="input" type="email" placeholder="Email" style="margin-bottom:9px"><input id="password" class="input" type="password" placeholder="Mot de passe">
+    <input id="email" class="input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Téléphone (+242...)" style="margin-bottom:9px"><input id="password" class="input" type="password" placeholder="Mot de passe">
     <button id="authBtn" class="primary" style="margin-top:14px" onclick="submitAuth()">Se connecter</button>
     <div id="authStatus" class="status"></div>
   </div>
@@ -88,48 +88,43 @@ function validConfig(){
   );
 }
 function authMode(m){document.getElementById('loginTab').classList.toggle('active',m==='login');document.getElementById('signupTab').classList.toggle('active',m==='signup');document.getElementById('signupFields').classList.toggle('hidden',m!=='signup');document.getElementById('authBtn').textContent=m==='login'?'Se connecter':'Créer mon compte';document.getElementById('authBtn').dataset.mode=m}
-async function submitAuth(){if(!validConfig()){setAuthStatus('Configuration Supabase incomplète dans le fichier.');return}const mode=document.getElementById('authBtn').dataset.mode||'login',email=document.getElementById('email').value.trim(),password=document.getElementById('password').value;if(!email||!password){setAuthStatus('Email et mot de passe requis.');return}setAuthStatus('Connexion…');let r;if(mode==='signup'){const meta={first_name:document.getElementById('firstName').value.trim(),last_name:document.getElementById('lastName').value.trim(),phone:document.getElementById('phone').value.trim()};r=await sb.auth.signUp({
-  email,
-  password,
-  options:{
-    data: meta,
-    emailRedirectTo: NZILA_SITE_URL
+function normalizeNzilaPhone(raw){
+  let p=(raw||'').replace(/[\s().-]/g,'');
+  if(p.startsWith('00')) p='+'+p.slice(2);
+  if(p.startsWith('242')) p='+'+p;
+  if(p.startsWith('0')) p='+242'+p.slice(1);
+  if(!/^\+242[0-9]{8,9}$/.test(p)) return null;
+  return p;
+}
+function nzilaClientAccounts(){try{return JSON.parse(localStorage.getItem('nzila_client_accounts')||'[]')}catch(e){return []}}
+function saveNzilaClientAccounts(a){localStorage.setItem('nzila_client_accounts',JSON.stringify(a))}
+async function submitAuth(){
+  const mode=document.getElementById('authBtn').dataset.mode||'login';
+  const phone=normalizeNzilaPhone(document.getElementById('email').value);
+  const password=document.getElementById('password').value;
+  if(!phone||!password){setAuthStatus('Numéro de téléphone et mot de passe requis.');return}
+  if(password.length<6){setAuthStatus('Le mot de passe doit contenir au moins 6 caractères.');return}
+  const accounts=nzilaClientAccounts();
+  if(mode==='signup'){
+    const first_name=document.getElementById('firstName').value.trim(),last_name=document.getElementById('lastName').value.trim();
+    if(!first_name||!last_name){setAuthStatus('Prénom et nom requis.');return}
+    if(accounts.some(a=>a.phone===phone)){setAuthStatus('Un compte existe déjà avec ce numéro.');return}
+    const u={id:'local-client-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),phone,first_name,last_name,role:'client',created_at:new Date().toISOString()};
+    accounts.push({...u,password});saveNzilaClientAccounts(accounts);
+    localStorage.setItem('nzila_client_session',JSON.stringify(u));
+    setAuthStatus('Compte NZILA créé.');await boot(u);return;
   }
-});if(r.error){setAuthStatus(r.error.message);return}
-if(r.data?.session){await boot(r.data.user);}
-else{setAuthStatus('Compte créé. Vérifiez votre email puis revenez sur NZILA.');}
-}else{r=await sb.auth.signInWithPassword({email,password});if(r.error){setAuthStatus(r.error.message);return}await boot(r.data.session.user)}}
+  const a=accounts.find(a=>a.phone===phone&&a.password===password);
+  if(!a){setAuthStatus('Numéro ou mot de passe incorrect.');return}
+  const u={...a};delete u.password;localStorage.setItem('nzila_client_session',JSON.stringify(u));await boot(u);
+}
 function setAuthStatus(t){document.getElementById('authStatus').textContent=t}
 async function boot(u){
-  user=u;
-
-  const {data,error}=await sb.from('profiles')
-    .select('*')
-    .eq('id',u.id)
-    .maybeSingle();
-
-  if(error){
-    setAuthStatus('Impossible de charger votre profil : '+error.message);
-    return;
-  }
-
-  if(!data){
-    setAuthStatus('Compte authentifié mais profil NZILA introuvable. Le trigger Supabase n’a pas créé le profil.');
-    return;
-  }
-
-  profile=data;
-  document.getElementById('auth').style.display='none';
-  document.getElementById('app').style.display='block';
-  updateProfile();
-  initMap();
-  loadHistory();
-  loadPeople();
-  loadFavorites();
-  loadNotifications();
-  subscribeRides();
+  user=u;profile={id:u.id,first_name:u.first_name||'',last_name:u.last_name||'',phone:u.phone||'',role:'client',is_active:true};
+  document.getElementById('auth').style.display='none';document.getElementById('app').style.display='block';
+  updateProfile();initMap();loadHistory();loadPeople();loadFavorites();loadNotifications();subscribeRides();
 }
-sb.auth.onAuthStateChange(async(event,session)=>{if(session&&!user) await boot(session.user);if(!session){user=null;document.getElementById('auth').style.display='grid';document.getElementById('app').style.display='none'}});
+sb.auth.onAuthStateChange(()=>{});if(!session){user=null;document.getElementById('auth').style.display='grid';document.getElementById('app').style.display='none'}});
 function updateProfile(){const n=((profile.first_name||'')+' '+(profile.last_name||'')).trim()||'Client NZILA';document.getElementById('profileName').textContent=n;document.getElementById('profilePhoneText').textContent=profile.phone||'Client NZILA';document.getElementById('avatar').textContent=((profile.first_name||'N')[0]+(profile.last_name||'Z')[0]).toUpperCase();document.getElementById('pFirst').value=profile.first_name||'';document.getElementById('pLast').value=profile.last_name||'';document.getElementById('pPhone').value=profile.phone||'';document.getElementById('pDept').value=profile.department||''}
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView(coords.Brazzaville,10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);setTimeout(()=>map.invalidateSize(),300)}function departmentChanged(){const d=document.getElementById('department').value;if(d&&coords[d]){map.flyTo(coords[d],10,{duration:1});toast('Carte centrée sur '+d)}}
 function openPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));const el=document.getElementById(p+'Page');if(!el)return;el.classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===p));window.scrollTo({top:0,behavior:'smooth'});if(p==='completed')loadHistory();if(p==='people')loadPeople();if(p==='favorites')loadFavorites();if(p==='notifications')loadNotifications();if(p==='home')setTimeout(()=>map&&map.invalidateSize(),200)}

@@ -59,11 +59,44 @@
 <section id="helpPage" class="page subpage"><div class="subhead"><button class="back" onclick="openPage('account')">←</button><h2>Aide</h2></div><div class="content"><div class="card" style="padding:18px"><div class="title">Questions fréquentes</div><details><summary>Comment commander ?</summary><p>Choisissez votre département, départ et destination puis lancez la recherche.</p></details><details><summary>Puis-je programmer ?</summary><p>Oui, choisissez Programmer ou utilisez le planning.</p></details><details><summary>Comment fonctionne le code sécurité ?</summary><p>Il sera utilisé pour confirmer la prise en charge avec le chauffeur.</p></details></div></div></section>
 <section id="notificationsPage" class="page subpage"><div class="subhead"><button class="back" onclick="openPage('home')">←</button><h2>Notifications</h2></div><div class="content"><div id="notifications" class="list"></div></div></section>
 <section id="servicePage" class="page subpage"><div class="subhead"><button class="back" onclick="openPage('services')">←</button><h2 id="serviceTitle">Service</h2></div><div class="content"><div class="card" style="padding:24px;text-align:center"><div id="serviceIcon" style="font-size:45px">✨</div><h2 id="serviceName" style="font:700 27px Outfit;margin-top:12px">Service</h2><p class="sub" style="margin-top:8px">Ce service sera connecté progressivement à l'écosystème NZILA.</p><button class="primary" onclick="toast('Service en préparation.')">Bientôt disponible</button></div></div></section>
-<nav class="bottom"><button class="nav active" data-page="home" onclick="openPage('home')"><div class="navicon">⌂</div>Accueil</button><button class="nav" data-page="services" onclick="openPage('services')"><div class="navicon">◈</div>Services</button><button class="nav" data-page="completed" onclick="openPage('completed')"><div class="navicon">✓</div>Terminés</button><button class="nav" data-page="account" onclick="openPage('account')"><div class="navicon">●</div>Compte</button></nav>
+<nav class="bottom"><button class="nav active" data-page="home" onclick="openPage('home')"><div class="navicon">⌂</div>Accueil</button><button class="nav" data-page="services" onclick="openPage('services')"><div class="navicon">◈</div>Services</button><button class="nav" data-page="completed" onclick="openPage('completed')"><div class="navicon">✓</div>Terminés</button><button class="nav" data-page="account" onclick="openPage('account')"><div class="navicon">●</div>Compte</button><button class="nav" data-page="nzilaPlus" onclick="openPage('nzilaPlus')"><div class="navicon">＋</div>Plus</button></nav>
 </div>
+<section class="page" id="nzilaPlusPage">
+  <div class="top"><div><div class="eyebrow">NZILA</div><h1>Centre NZILA</h1><p class="muted">Accès rapide aux fonctions avancées.</p></div></div>
+  <div class="grid">
+    <div class="card actionCard" onclick="openPage('tracking')"><div class="itemicon">📍</div><h3>Suivi de course</h3><p class="muted">Voir l'état de la course et le chauffeur en temps réel.</p></div>
+    <div class="card actionCard" onclick="openPage('activity')"><div class="itemicon">📊</div><h3>Activité</h3><p class="muted">Courses, paiements et événements récents.</p></div>
+    <div class="card actionCard" onclick="openPage('securityCenter')"><div class="itemicon">🛡️</div><h3>Sécurité</h3><p class="muted">SOS, partage de position et contacts d'urgence.</p></div>
+    <div class="card actionCard" onclick="openPage('preferences')"><div class="itemicon">⚙️</div><h3>Préférences</h3><p class="muted">Notifications et préférences de l'application.</p></div>
+  </div>
+</section>
+<section class="page" id="trackingPage">
+ <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">COURSE</div><h1>Suivi en direct</h1></div></div>
+ <div class="card"><div id="trackStatus" class="badge orange">Aucune course active</div><h2 id="trackTitle">—</h2><p id="trackRoute" class="muted">—</p><div id="trackDriver" class="routebox">En attente des informations chauffeur.</div><div id="trackMap" style="height:260px;border-radius:16px;margin-top:12px"></div><div class="row" style="margin-top:12px"><button class="btn primary" onclick="refreshTracking()">Actualiser</button><button class="btn danger" onclick="cancelActiveRide()">Annuler</button></div></div>
+</section>
+<section class="page" id="activityPage">
+ <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">HISTORIQUE</div><h1>Mon activité</h1></div></div>
+ <div class="card"><h3>Courses récentes</h3><div id="activityRides" class="list"></div></div>
+ <div class="card"><h3>Paiements</h3><div id="activityPayments" class="list"></div></div>
+</section>
+<section class="page" id="securityCenterPage">
+ <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">PROTECTION</div><h1>Sécurité</h1></div></div>
+ <div class="card"><h3>Urgence</h3><p class="muted">En cas de danger réel, utilisez également les services d'urgence locaux.</p><button class="btn danger wide" onclick="triggerClientSOS()">🆘 Déclencher un SOS</button></div>
+ <div class="card"><h3>Position</h3><p id="securityGps" class="muted">Position non vérifiée.</p><button class="btn wide" onclick="checkSecurityGPS()">Partager ma position</button></div>
+ <div class="card"><h3>Contact d'urgence</h3><input id="plusEmergencyName" class="input" placeholder="Nom"><input id="plusEmergencyPhone" class="input" placeholder="Téléphone"><button class="btn primary wide" onclick="savePlusEmergency()">Enregistrer</button></div>
+</section>
+<section class="page" id="preferencesPage">
+ <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">APPLICATION</div><h1>Préférences</h1></div></div>
+ <div class="card"><label class="item"><span>🔔 Notifications</span><input id="prefNotif" type="checkbox" checked onchange="savePrefs()"></label><label class="item"><span>📍 GPS haute précision</span><input id="prefGps" type="checkbox" checked onchange="savePrefs()"></label><label class="item"><span>📳 Confirmation avant actions sensibles</span><input id="prefConfirm" type="checkbox" checked onchange="savePrefs()"></label></div>
+ <div class="card"><h3>Version</h3><p class="muted">NZILA Client — fonctionnalités avancées.</p><button class="btn wide" onclick="toast('Application prête.')">Vérifier l'état</button></div>
+</section>
 <div id="rideModal" class="modal"><div class="sheet"><div class="handle"></div><h3 id="rideModalTitle">Recherche en cours</h3><p id="rideModalText">Nous transmettons votre demande au réseau NZILA.</p><div id="rideBox" class="routebox"></div><button class="primary" id="rideModalBtn" onclick="closeRideModal()">Fermer</button></div></div>
 <div id="toast" class="toast"></div>
 <!-- NZILA — Supabase -->
+<style>
+.actionCard{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.actionCard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const SUPABASE_URL='https://dsvbtlwxujuusnarcbfg.supabase.co';
@@ -378,5 +411,16 @@ function nzcWireButtons(){
 setTimeout(nzcRestore,0);
 setTimeout(nzcWireButtons,50);
 
+</script>
+<script>
+let plusTrackMap=null,plusTrackMarker=null;
+async function refreshTracking(){if(!user?.id)return;const q=await sb.from('rides').select('*').eq('user_id',user.id).in('status',['requested','searching','accepted','driver_arriving','arrived','in_progress']).order('created_at',{ascending:false}).limit(1).maybeSingle();if(q.error)return toast(q.error.message);const r=q.data;if(!r){$('trackStatus').textContent='Aucune course active';$('trackStatus').className='badge orange';return}activeRideId=r.id;$('trackTitle').textContent='Course #'+String(r.id).slice(0,8);$('trackRoute').textContent=(r.pickup_address||'Départ')+' → '+(r.destination_address||'Destination');$('trackStatus').textContent=r.status;$('trackStatus').className='badge '+(['completed','cancelled'].includes(r.status)?'green':'orange');if(r.driver_id){const d=await sb.from('profiles').select('first_name,last_name,phone').eq('id',r.driver_id).maybeSingle();$('trackDriver').innerHTML=d.data?'<b>'+esc((d.data.first_name||'')+' '+(d.data.last_name||''))+'</b><br><small>'+esc(d.data.phone||'')+'</small>':'Chauffeur affecté';const g=await sb.from('driver_locations').select('*').eq('driver_id',r.driver_id).maybeSingle();if(g.data){if(!plusTrackMap)plusTrackMap=L.map('trackMap').setView([g.data.latitude,g.data.longitude],15),L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(plusTrackMap);else plusTrackMap.setView([g.data.latitude,g.data.longitude],15);if(plusTrackMarker)plusTrackMarker.setLatLng([g.data.latitude,g.data.longitude]);else plusTrackMarker=L.marker([g.data.latitude,g.data.longitude]).addTo(plusTrackMap)}}}
+async function cancelActiveRide(){if(!activeRideId)return toast('Aucune course active.');if(!confirm('Annuler la course ?'))return;const r=await sb.rpc('nzila_update_ride_status',{p_ride_id:activeRideId,p_status:'cancelled'});if(r.error)return toast(r.error.message);toast('Course annulée.');refreshTracking()}
+async function loadActivity(){if(!user?.id)return;const r=await sb.from('rides').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(30);$('activityRides').innerHTML=r.data?.length?r.data.map(x=>'<div class="item"><div>🚕</div><div><b>'+esc(x.pickup_address||'Course')+'</b><small>'+esc(x.destination_address||'')+' · '+esc(x.status)+'</small></div><strong>'+money(x.final_price||x.estimated_price||0)+'</strong></div>').join(''):'<p class="muted">Aucune course.</p>';const p=await sb.from('ride_payments').select('*').eq('client_id',user.id).order('created_at',{ascending:false}).limit(30);$('activityPayments').innerHTML=p.data?.length?p.data.map(x=>'<div class="item"><div>💳</div><div><b>'+money(x.amount)+'</b><small>'+esc(x.method)+' · '+esc(x.status)+'</small></div></div>').join(''):'<p class="muted">Aucun paiement.</p>'}
+async function checkSecurityGPS(){try{const p=await getCurrentPosition();$('securityGps').textContent='Position : '+p.coords.latitude.toFixed(5)+', '+p.coords.longitude.toFixed(5);if(navigator.share)await navigator.share({title:'Position NZILA',text:'Ma position actuelle : https://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude});else await navigator.clipboard.writeText('https://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude);toast('Position prête à être partagée.')}catch(e){toast('GPS : '+e.message)}}
+function savePlusEmergency(){const n=$('plusEmergencyName').value.trim(),p=$('plusEmergencyPhone').value.trim();if(!n||!p)return toast('Complétez les informations.');localStorage.setItem('nzila_emergency',JSON.stringify({name:n,phone:p}));toast('Contact d’urgence enregistré.')}
+function savePrefs(){localStorage.setItem('nzila_preferences',JSON.stringify({notif:$('prefNotif').checked,gps:$('prefGps').checked,confirm:$('prefConfirm').checked}));toast('Préférences enregistrées.')}
+function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('nzila_preferences')||'{}');if(p.notif!==undefined)$('prefNotif').checked=p.notif;if(p.gps!==undefined)$('prefGps').checked=p.gps;if(p.confirm!==undefined)$('prefConfirm').checked=p.confirm}catch{}}
+const _openPageClient=openPage;openPage=function(p){_openPageClient(p);if(p==='tracking')setTimeout(refreshTracking,150);if(p==='activity')loadActivity();if(p==='preferences')loadPrefs()};
 </script>
 </body></html>

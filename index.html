@@ -1,13 +1,109 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NZILA — Client V3</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NZILA — Client V3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
 *{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:#07110e;color:#f5faf7}button,input,select{font:inherit}button{cursor:pointer;border:0}.wrap{max-width:1100px;margin:auto;padding:20px}.card{background:#0d1b17;border:1px solid #1d342c;border-radius:22px;padding:20px;margin-bottom:16px}.brand{font-size:30px;font-weight:900}.muted{color:#8ea39b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}input,select{width:100%;padding:13px 14px;background:#09130f;color:white;border:1px solid #294238;border-radius:13px;margin:5px 0 10px}.btn{padding:13px 16px;border-radius:13px;font-weight:800}.primary{background:#39d391;color:#062117}.ghost{background:#20332c;color:#fff}.danger{background:#c94b4b;color:#fff}.hidden{display:none}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.pill{display:inline-block;padding:7px 11px;border-radius:999px;background:#17382c;color:#6ce1ac;font-weight:800;font-size:12px}.price{font-size:30px;font-weight:900}.ride{border:1px solid #254338;border-radius:16px;padding:15px;margin:10px 0}.navbottom{position:sticky;bottom:0;background:#07110e;padding:10px 0;display:flex;gap:8px;justify-content:center}.navbottom button{background:#13231e;color:white;padding:11px 13px;border-radius:12px}#map{height:420px;border-radius:18px}#driverMap{height:300px;border-radius:18px}@media(max-width:750px){.grid,.grid3{grid-template-columns:1fr}.wrap{padding:12px}.card{padding:16px}}
-</style></head><body><main class="wrap">
-<section id="auth" class="card" style="max-width:540px;margin:6vh auto"><div class="brand">NZILA</div><p class="muted">Réserver un trajet. Votre numéro +242 est votre identifiant.</p><div class="tabs"><button class="btn primary" onclick="authMode('signup')">Créer un compte</button><button class="btn ghost" onclick="authMode('login')">Connexion</button></div><div id="signupBox"><input id="sFirst" placeholder="Prénom"><input id="sLast" placeholder="Nom"><input id="sPhone" placeholder="+242 Votre numéro de téléphone"><input id="sPass" type="password" placeholder="Mot de passe"><select id="sDept"><option>Brazzaville</option><option>Pointe-Noire</option><option>Dolisie</option><option>Autre</option></select><button class="btn primary" style="width:100%" onclick="signup()">Créer mon compte</button></div><div id="loginBox" class="hidden"><input id="lPhone" placeholder="+242 Votre numéro de téléphone"><input id="lPass" type="password" placeholder="Mot de passe"><button class="btn primary" style="width:100%" onclick="login()">Se connecter</button></div><p id="authMsg" class="muted"></p></section>
-<section id="app" class="hidden"><div class="card"><div class="brand">NZILA <span class="pill">CLIENT</span></div><div class="row" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span id="hello" class="muted"></span><button class="btn ghost" onclick="logout()">Déconnexion</button></div></div>
-<div class="tabs"><button class="btn primary" onclick="page('home')">Réserver</button><button class="btn ghost" onclick="page('active')">Course</button><button class="btn ghost" onclick="page('history')">Historique</button><button class="btn ghost" onclick="page('profile')">Profil</button></div>
-<section id="home"><div class="grid"><div class="card"><h2>Où allez-vous ?</h2><input id="pickup" placeholder="Lieu de départ"><input id="destination" placeholder="Destination"><div class="grid"><input id="price" type="number" value="2500" min="0" placeholder="Prix estimé FCFA"><select id="payment"><option value="cash">Espèces</option><option value="mtn">MTN Mobile Money</option><option value="airtel">Airtel Money</option></select></div><div class="grid"><input id="passengers" type="number" value="1" min="1" max="8" placeholder="Passagers"><input id="baggage" type="number" value="0" min="0" max="20" placeholder="Bagages"></div><button class="btn primary" style="width:100%" onclick="requestRide()">Rechercher un chauffeur</button><p id="rideMsg" class="muted"></p></div><div class="card"><h2>Carte</h2><div id="map"></div><p class="muted">La position réelle du chauffeur apparaîtra ici lorsqu'une course est acceptée.</p></div></div></section>
-<section id="active" class="hidden"><div class="card"><h2>Ma course</h2><div id="activeRide">Aucune course active.</div></div></section>
-<section id="history" class="hidden"><div class="card"><h2>Mes courses</h2><div id="historyList"></div></div></section>
-<section id="profile" class="hidden"><div class="card"><h2>Mon profil</h2><div id="profileBox"></div></div></section></section>
+</style></head>
+<body>
+<main class="wrap">
+<section id="auth" class="card" style="max-width:540px;margin:6vh auto">
+<div class="brand">NZILA</div>
+<p class="muted">Réserver un trajet. Votre numéro +242 est votre identifiant.</p>
+<div class="tabs">
+<button class="btn primary" onclick="authMode('signup')">Créer un compte</button>
+<button class="btn ghost" onclick="authMode('login')">Connexion</button>
+</div>
+<div id="signupBox">
+<input id="sFirst" placeholder="Prénom">
+<input id="sLast" placeholder="Nom">
+<input id="sPhone" placeholder="+242 Votre numéro de téléphone">
+<input id="sPass" type="password" placeholder="Mot de passe">
+<select id="sDept">
+<option>Brazzaville</option>
+<option>Pointe-Noire</option>
+<option>Dolisie</option>
+<option>Autre</option>
+</select>
+<button class="btn primary" style="width:100%" onclick="signup()">Créer mon compte</button>
+</div>
+<div id="loginBox" class="hidden">
+<input id="lPhone" placeholder="+242 Votre numéro de téléphone">
+<input id="lPass" type="password" placeholder="Mot de passe">
+<button class="btn primary" style="width:100%" onclick="login()">Se connecter</button>
+</div>
+<p id="authMsg" class="muted">
+</p>
+</section>
+<section id="app" class="hidden">
+<div class="card">
+<div class="brand">NZILA <span class="pill">CLIENT</span>
+</div>
+<div class="row" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+<span id="hello" class="muted">
+</span>
+<button class="btn ghost" onclick="logout()">Déconnexion</button>
+</div>
+</div>
+<div class="tabs">
+<button class="btn primary" onclick="page('home')">Réserver</button>
+<button class="btn ghost" onclick="page('active')">Course</button>
+<button class="btn ghost" onclick="page('history')">Historique</button>
+<button class="btn ghost" onclick="page('profile')">Profil</button>
+</div>
+<section id="home">
+<div class="grid">
+<div class="card">
+<h2>Où allez-vous ?</h2>
+<input id="pickup" placeholder="Lieu de départ">
+<input id="destination" placeholder="Destination">
+<div class="grid">
+<input id="price" type="number" value="2500" min="0" placeholder="Prix estimé FCFA">
+<select id="payment">
+<option value="cash">Espèces</option>
+<option value="mtn">MTN Mobile Money</option>
+<option value="airtel">Airtel Money</option>
+</select>
+</div>
+<div class="grid">
+<input id="passengers" type="number" value="1" min="1" max="8" placeholder="Passagers">
+<input id="baggage" type="number" value="0" min="0" max="20" placeholder="Bagages">
+</div>
+<button class="btn primary" style="width:100%" onclick="requestRide()">Rechercher un chauffeur</button>
+<p id="rideMsg" class="muted">
+</p>
+</div>
+<div class="card">
+<h2>Carte</h2>
+<div id="map">
+</div>
+<p class="muted">La position réelle du chauffeur apparaîtra ici lorsqu'une course est acceptée.</p>
+</div>
+</div>
+</section>
+<section id="active" class="hidden">
+<div class="card">
+<h2>Ma course</h2>
+<div id="activeRide">Aucune course active.</div>
+</div>
+</section>
+<section id="history" class="hidden">
+<div class="card">
+<h2>Mes courses</h2>
+<div id="historyList">
+</div>
+</div>
+</section>
+<section id="profile" class="hidden">
+<div class="card">
+<h2>Mon profil</h2>
+<div id="profileBox">
+</div>
+</div>
+</section>
+</section>
 </main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const URL='https://dsvbtlwxujuusnarcbfg.supabase.co',KEY='sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G',sb=window.supabase.createClient(URL,KEY);const SK='nzila_client_v3';let session=JSON.parse(localStorage.getItem(SK)||'null'),map,driverMarkers={},rideSub;
 const $=id=>document.getElementById(id);function normPhone(v){let x=(v||'').replace(/\s+/g,'');if(/^0\d{9}$/.test(x))x='+242'+x.slice(1);if(/^242\d{9}$/.test(x))x='+'+x;return x}function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function money(v){return Number(v||0).toLocaleString('fr-FR')+' FCFA'}async function rpc(n,a){const r=await sb.rpc(n,a);if(r.error)throw r.error;return r.data}function authMode(m){$('signupBox').classList.toggle('hidden',m!=='signup');$('loginBox').classList.toggle('hidden',m!=='login');$('authMsg').textContent=''}function setSession(x){session=x;localStorage.setItem(SK,JSON.stringify(x))}function logout(){localStorage.removeItem(SK);location.reload()}
@@ -23,4 +119,5 @@ function updateDriver(x){const pos=[x.latitude,x.longitude];if(driverMarkers[x.d
 async function loadHistory(){const r=await sb.from('rides').select('*').eq('user_id',session.id).order('created_at',{ascending:false}).limit(50);$('historyList').innerHTML=r.data?.length?r.data.map(x=>`<div class="ride"><b>${esc(x.status)}</b><br>${esc(x.pickup_address)} → ${esc(x.destination_address)}<br>${money(x.final_price??x.estimated_price)}</div>`).join(''):'Aucune course.'}
 function renderProfile(){$('profileBox').innerHTML=`<p><b>${esc(session.first_name)} ${esc(session.last_name)}</b></p><p>${esc(session.phone)}</p><p>${esc(session.department||'')}</p>`}
 window.addEventListener('load',()=>{if(!session)return; $('auth').classList.add('hidden');$('app').classList.remove('hidden');$('hello').textContent='Bonjour '+session.first_name+' 👋';map=L.map('map').setView([-4.2634,15.2429],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);loadActive()});
-</script></body></html>
+</script></body>
+</html>

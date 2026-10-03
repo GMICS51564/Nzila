@@ -175,4 +175,208 @@ async function triggerClientSOS(){try{const p=await getCurrentPosition();const {
 function logout(){if(rideChannel)try{sb.removeChannel(rideChannel)}catch{};if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};localStorage.removeItem('nzila_client_session');user=null;profile=null;$('app').style.display='none';$('auth').style.display='grid';authMode('login');toast('Déconnexion effectuée')}
 let tt;function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2800)}
 window.addEventListener('DOMContentLoaded',async()=>{try{const s=JSON.parse(localStorage.getItem('nzila_client_session')||'null');if(s?.id&&isUuid(s.id)){const {data}=await sb.rpc('nzila_login',{p_phone:s.phone,p_password:s.__password||''});if(data?.id){} } }catch{}authMode('login')});
-</script></body></html>
+</script><script>
+/* NZILA CLIENT — logique complète additive, UI conservée */
+const NZC = { locationChannel:null, driverMarker:null, offerTimer:null, initialized:false };
+
+function nzcErr(e){ return String(e?.message||e||'Erreur').replace('Error: ',''); }
+function nzcSession(){ try{return JSON.parse(localStorage.getItem('nzila_client_session')||'null')}catch{return null} }
+function nzcScheduleISO(){ if(mode!=='schedule') return null; const d=$('rideDate')?.value,t=$('rideTime')?.value; return d&&t ? new Date(d+'T'+t).toISOString() : null; }
+
+async function createRide(){
+  if(!user?.id)return toast('Connectez-vous pour commander un trajet.');
+  const department=$('department').value,pickup=$('pickup').value.trim(),destination=$('destination').value.trim();
+  if(!department||!pickup||!destination)return toast('Département, départ et destination sont requis.');
+  if(mode==='schedule'&&(!$('rideDate').value||!$('rideTime').value))return toast('Choisissez une date et une heure.');
+  const scheduled_at=nzcScheduleISO();
+  if(scheduled_at&&new Date(scheduled_at)<=new Date())return toast('Choisissez une date et une heure futures.');
+  const [lat,lng]=await getPickupCoords();
+  const {data,error}=await sb.rpc('nzila_create_ride_app',{
+    p_user_id:user.id,p_pickup_address:pickup,p_destination_address:destination,
+    p_estimated_price:price(),p_payment_method:'cash',
+    p_pickup_latitude:lat,p_pickup_longitude:lng,
+    p_destination_latitude:null,p_destination_longitude:null
+  });
+  if(error)return toast('Impossible de créer la course : '+nzcErr(error));
+  const rideId=data?.ride_id||data?.id;if(!rideId)return toast('Course créée mais identifiant introuvable.');
+  activeRideId=rideId; localStorage.setItem('nzila_active_ride',rideId);
+  const detail=await sb.rpc('nzila_prepare_ride_details',{
+    p_ride_id:rideId,p_user_id:user.id,p_passenger_type:passengerType,
+    p_passenger_name:passengerType==='other'?$('otherName').value.trim():null,
+    p_passenger_phone:passengerType==='other'?normalizeNzilaPhone($('otherPhone').value):null,
+    p_department:department,p_city:null,p_neighborhood:null,p_passengers:passengers,p_baggage:bags,
+    p_scheduled_at:scheduled_at,p_destination_latitude:null,p_destination_longitude:null
+  });
+  if(detail.error){console.warn('Détails course:',detail.error.message)}
+  if(scheduled_at){
+    toast('Trajet programmé. Il sera dispatché à l’heure prévue.');
+  }else{
+    const match=await sb.rpc('nzila_match_ride',{p_ride_id:rideId});
+    if(match.error)console.warn('Matching NZILA:',match.error.message);
+  }
+  const {data:ride}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+  if(ride){showRideModal(ride);subscribeToRide(rideId);if(ride.status==='accepted')await ensureRidePayment(ride)}
+  const pending=localStorage.getItem('nzila_pending_code');
+  if(pending){const rr=await sb.rpc('nzila_set_client_code',{p_ride_id:rideId,p_client_id:user.id,p_code:pending});if(!rr.error)localStorage.removeItem('nzila_pending_code')}
+}
+
+async function ensureRidePayment(ride){
+  if(!ride?.id)return;
+  const method=ride.payment_method==='mtn'?'mtn_money':ride.payment_method==='airtel'?'airtel_money':'cash';
+  const {error}=await sb.rpc('nzila_create_payment',{p_ride_id:ride.id,p_method:method});
+  if(error)console.warn('Paiement NZILA:',error.message);
+}
+
+function showRideModal(r){
+  if(!r)return;
+  activeRideId=r.id;
+  $('rideModalTitle').textContent=labelStatus(r.status);
+  $('rideBox').innerHTML='<strong>'+esc(r.pickup_address)+' → '+esc(r.destination_address)+'</strong><br><span class="muted">'+labelStatus(r.status)+'</span>'+(r.driver_id?'<br><span class="muted">Chauffeur assigné · suivi GPS actif</span>':'');
+  $('rideModalBtn').textContent=r.status==='completed'?'Voir mes trajets':'Fermer';
+  $('rideModal').classList.add('show');
+}
+function closeRideModal(){
+  if($('rideModalBtn').textContent==='Voir mes trajets')openPage('completed');
+  $('rideModal').classList.remove('show');
+}
+function subscribeToRide(id){
+  if(!id)return;
+  if(rideChannel)try{sb.removeChannel(rideChannel)}catch{}
+  rideChannel=sb.channel('nzila-client-ride-'+id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'id=eq.'+id},async p=>{
+      if(p.new){showRideModal(p.new);if(p.new.status==='accepted'||p.new.status==='driver_arriving')await ensureRidePayment(p.new);if(p.new.status==='completed'){toast('Votre course est terminée.');loadHistory()}}
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'driver_locations'},p=>{if(p.new?.driver_id&&activeRideId===id)updateClientDriverMarker(p.new)})
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'driver_locations'},p=>{if(p.new?.driver_id&&activeRideId===id)updateClientDriverMarker(p.new)})
+    .subscribe();
+}
+function subscribeRides(){if(!user?.id)return;subscribeToRide(activeRideId);if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};subscribeNotifications()}
+function subscribeNotifications(){
+  if(!user?.id)return;
+  if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{}
+  notificationChannel=sb.channel('nzila-client-notifications-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+user.id},p=>{toast('🔔 '+(p.new.title||'Nouvelle notification'));loadNotifications()}).subscribe();
+}
+function updateClientDriverMarker(x){
+  if(!map||!x?.latitude||!x?.longitude)return;
+  const pos=[x.latitude,x.longitude];
+  if(NZC.driverMarker)NZC.driverMarker.setLatLng(pos);else NZC.driverMarker=L.marker(pos).addTo(map).bindPopup('Chauffeur NZILA');
+}
+
+async function loadHistory(){
+  const el=$('history');if(!user?.id)return;
+  const {data,error}=await sb.from('rides').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
+  if(error){el.innerHTML='<div class="card" style="padding:18px">Historique indisponible : '+esc(error.message)+'</div>';return}
+  el.innerHTML=data?.length?data.map(r=>'<div class="card historycard"><div class="histtop"><span class="muted">'+new Date(r.created_at).toLocaleDateString('fr-FR')+'</span><b>'+money(r.final_price??r.estimated_price)+'</b></div><div class="route"><div class="rline"><i></i><span></span><i></i></div><div class="rtext">'+esc(r.pickup_address)+'<br>'+esc(r.destination_address)+'<br><span class="muted">'+labelStatus(r.status)+'</span></div></div>'+(r.status==='completed'?'<button class="outline" style="margin-top:12px" onclick="rateRide(\''+r.id+'\')">Noter le trajet</button>':'')+'</div>').join(''):'<div class="card" style="padding:22px;text-align:center">🛣️<br><b>Aucun trajet</b><p class="muted">Vos courses apparaîtront ici.</p></div>';
+}
+async function rateRide(id){
+  const rating=prompt('Note de 1 à 5 :');if(!rating||!Number.isInteger(+rating)||+rating<1||+rating>5)return;
+  const comment=prompt('Commentaire (facultatif)')||'';
+  let r=await sb.rpc('rate_driver_v2',{p_ride_id:id,p_user_id:user.id,p_rating:+rating,p_comment:comment});
+  if(r.error)r=await sb.from('ride_ratings').insert({ride_id:id,user_id:user.id,rating:+rating,comment});
+  toast(r.error?'Avis non synchronisé : '+r.error.message:'Merci pour votre avis ⭐');
+}
+async function loadNotifications(){
+  const e=$('notifications');if(!user?.id)return;
+  const {data,error}=await sb.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(50);
+  if(error){e.innerHTML='<div class="card" style="padding:18px">Notifications indisponibles : '+esc(error.message)+'</div>';return}
+  e.innerHTML=data?.length?data.map(x=>'<button class="item" onclick="readNotification(\''+x.id+'\')" style="width:100%"><div class="itemicon">'+(x.type==='sos'?'🆘':'🔔')+'</div><div><strong>'+esc(x.title)+'</strong><small>'+esc(x.message||x.body||'')+'</small></div><span class="arrow">'+(x.is_read?'':'●')+'</span></button>').join(''):'<div class="card" style="padding:18px">Aucune notification.</div>';
+}
+async function readNotification(id){const {error}=await sb.rpc('nzila_mark_notification_read',{p_notification_id:id});if(error)toast(error.message);else loadNotifications()}
+
+async function setCode(){
+  const c=prompt('Définissez votre code de sécurité à 4 chiffres');
+  if(!c)return;
+  if(!/^\d{4}$/.test(c))return toast('Le code doit contenir 4 chiffres.');
+  const {error}=await sb.rpc('nzila_set_client_default_code',{p_user_id:user.id,p_code:c});
+  if(error)return toast('Code non enregistré : '+error.message);
+  if(activeRideId)await sb.rpc('nzila_set_client_code',{p_ride_id:activeRideId,p_client_id:user.id,p_code:c});else localStorage.setItem('nzila_pending_code',c);
+  toast('Code de sécurité enregistré.');
+}
+async function saveEmergency(){
+  const name=$('emName').value.trim(),phone=normalizeNzilaPhone($('emPhone').value)||$('emPhone').value.trim();
+  if(!name||!phone)return toast('Complétez les informations.');
+  const {error}=await sb.rpc('nzila_save_client_settings',{p_user_id:user.id,p_emergency_name:name,p_emergency_phone:phone});
+  if(error)return toast('Contact non enregistré : '+error.message);
+  toast('Contact d’urgence enregistré.');
+}
+async function addMoney(provider){
+  const n=normalizeNzilaPhone(prompt('Numéro '+provider+' Mobile Money')||'');if(!n)return toast('Numéro invalide.');
+  const args={p_user_id:user.id,p_mtn_phone:provider==='MTN'?n:null,p_airtel_phone:provider==='Airtel'?n:null};
+  const {error}=await sb.rpc('nzila_save_client_settings',args);
+  if(error)return toast('Numéro non enregistré : '+error.message);
+  toast(provider+' Mobile Money enregistré.');
+}
+async function shareLocation(){
+  try{const p=await getCurrentPosition();const text='Ma position NZILA : '+p.coords.latitude+','+p.coords.longitude;if(navigator.share)await navigator.share({title:'NZILA',text});else await navigator.clipboard?.writeText(text);toast(navigator.share?'Position partagée.':'Position copiée.')}catch(e){toast('Impossible d’obtenir la position.')}
+}
+async function savePlanning(){
+  const pickup=$('planPickup').value.trim(),destination=$('planDestination').value.trim(),date=$('planDate').value,time=$('planTime').value;
+  if(!pickup||!destination||!date||!time)return toast('Complétez le trajet planifié.');
+  const at=new Date(date+'T'+time);if(at<=new Date())return toast('Choisissez une date future.');
+  const {error}=await sb.from('nzila_planned_rides').insert({user_id:user.id,pickup_address:pickup,destination_address:destination,scheduled_at:at.toISOString()});
+  if(error)return toast('Planning non enregistré : '+error.message);
+  $('pickup').value=pickup;$('destination').value=destination;$('rideDate').value=date;$('rideTime').value=time;setMode('schedule');toast('Trajet planifié.');
+}
+async function loadPeople(){
+  const e=$('people');const {data,error}=await sb.from('people').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
+  if(error){e.innerHTML='<div class="card" style="padding:18px">Impossible de charger les proches.</div>';return}
+  e.innerHTML=data?.length?data.map(x=>'<div class="item"><div class="itemicon">👤</div><div><strong>'+esc(x.name)+'</strong><small>'+esc(x.phone)+'</small></div><span class="arrow">›</span></div>').join(''):'<div class="card" style="padding:18px">Ajoutez vos proches pour réserver plus vite.</div>';
+}
+async function addPerson(){
+  const name=prompt('Nom du passager');if(!name)return;const phone=normalizeNzilaPhone(prompt('Téléphone')||'');if(!phone)return toast('Téléphone invalide.');
+  const {error}=await sb.from('people').insert({user_id:user.id,name:name.trim(),phone});if(error)return toast('Proche non ajouté : '+error.message);loadPeople();toast('Passager ajouté.');
+}
+async function loadFavorites(){
+  const e=$('favorites');const {data,error}=await sb.from('favorites').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
+  if(error){e.innerHTML='<div class="card" style="padding:18px">Impossible de charger les favoris.</div>';return}
+  e.innerHTML=data?.length?data.map(x=>'<div class="item"><div class="itemicon">⭐</div><div><strong>'+esc(x.name)+'</strong><small>'+esc(x.address)+'</small></div><span class="arrow">›</span></div>').join(''):'<div class="card" style="padding:18px">Aucun favori pour le moment.</div>';
+}
+async function addFavorite(){
+  const name=prompt('Nom du lieu');if(!name)return;const address=prompt('Adresse');if(!address)return;
+  const {error}=await sb.from('favorites').insert({user_id:user.id,name:name.trim(),address:address.trim()});if(error)return toast('Favori non ajouté : '+error.message);loadFavorites();toast('Favori ajouté.');
+}
+
+async function sendMessage(){
+  const i=$('msg'),v=i.value.trim();if(!v||!user?.id)return;
+  let {data:conv}=await sb.from('conversations').select('*').eq('user_id',user.id).eq('type','support').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(!conv){const r=await sb.from('conversations').insert({user_id:user.id,type:'support'}).select().single();if(r.error)return toast('Messagerie indisponible : '+r.error.message);conv=r.data;}
+  const r=await sb.from('messages').insert({conversation_id:conv.id,sender_id:user.id,content:v});
+  if(r.error)return toast('Message non envoyé : '+r.error.message);
+  i.value='';loadMessages();toast('Message envoyé à NZILA.');
+}
+async function loadMessages(){
+  if(!user?.id||!$('msgs'))return;
+  const {data:conv}=await sb.from('conversations').select('id').eq('user_id',user.id).eq('type','support').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(!conv)return;
+  const {data}=await sb.from('messages').select('*').eq('conversation_id',conv.id).order('created_at',{ascending:true}).limit(100);
+  if(data?.length)$('msgs').innerHTML=data.map(m=>'<div style="background:'+(m.sender_id===user.id?'#123c68':'#f2eee8')+';color:'+(m.sender_id===user.id?'#fff':'inherit')+';padding:11px;border-radius:14px;font-size:11px;margin:9px 0 '+(m.sender_id===user.id?'9px 25px':'9px 25px 9px 0')+'">'+esc(m.content)+'</div>').join('');
+}
+async function saveProfile(){
+  const first=$('pFirst').value.trim(),last=$('pLast').value.trim(),phone=normalizeNzilaPhone($('pPhone').value);if(!first||!last||!phone)return toast('Prénom, nom et téléphone sont requis.');
+  const {data,error}=await sb.rpc('nzila_update_client_profile_app',{p_user_id:user.id,p_first_name:first,p_last_name:last,p_phone:phone});if(error)return toast('Profil non enregistré : '+error.message);
+  profile={...profile,...data,department:$('pDept').value};user={...user,...data,department:$('pDept').value};localStorage.setItem('nzila_client_session',JSON.stringify(user));updateProfile();toast('Profil enregistré dans NZILA');
+}
+async function triggerClientSOS(){
+  try{const p=await getCurrentPosition();const {error}=await sb.rpc('nzila_trigger_sos',{p_user_id:user.id,p_ride_id:isUuid(activeRideId)?activeRideId:null,p_type:'emergency',p_latitude:p.coords.latitude,p_longitude:p.coords.longitude,p_accuracy:p.coords.accuracy||null,p_message:'SOS client NZILA'});if(error)throw error;toast('🆘 Alerte SOS transmise à NZILA.');}catch(e){toast('SOS : '+nzcErr(e))}
+}
+function logout(){if(rideChannel)try{sb.removeChannel(rideChannel)}catch{};if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};localStorage.removeItem('nzila_client_session');user=null;profile=null;$('app').style.display='none';$('auth').style.display='block';authMode('login');toast('Session fermée.')}
+
+function openPage(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));const el=$(p+'Page');if(!el)return;el.classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===p));window.scrollTo({top:0,behavior:'smooth'});
+  if(p==='completed')loadHistory();if(p==='people')loadPeople();if(p==='favorites')loadFavorites();if(p==='notifications')loadNotifications();if(p==='messages')loadMessages();if(p==='home')setTimeout(()=>map&&map.invalidateSize(),200);
+}
+
+async function nzcRestore(){
+  const s=nzcSession();if(!s?.id)return;
+  user=s;profile={...s};$('auth').style.display='none';$('app').style.display='block';
+  await refreshProfile();updateProfile();initMap();activeRideId=localStorage.getItem('nzila_active_ride')||null;loadHistory();loadPeople();loadFavorites();loadNotifications();loadMessages();subscribeRides();
+  if(activeRideId){const {data}=await sb.from('rides').select('*').eq('id',activeRideId).maybeSingle();if(data)showRideModal(data)}
+}
+function nzcWireButtons(){
+  document.querySelectorAll('#accountPage .item').forEach(b=>{const t=b.innerText||'';if(t.includes('Portefeuille'))b.onclick=()=>openPage('wallet');if(t.includes('Messagerie'))b.onclick=()=>openPage('messages')});
+}
+setTimeout(nzcRestore,0);
+setTimeout(nzcWireButtons,50);
+
+</script>
+</body></html>

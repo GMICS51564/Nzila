@@ -20,7 +20,10 @@
     <div id="signupFields" class="hidden">
       <input id="firstName" class="input" placeholder="Prénom" style="margin-bottom:9px"><input id="lastName" class="input" placeholder="Nom" style="margin-bottom:9px"><input id="phone" class="input" placeholder="Téléphone" style="margin-bottom:9px">
     </div>
-    <input id="email" class="input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Téléphone (+242...)" style="margin-bottom:9px"><input id="password" class="input" type="password" placeholder="Mot de passe">
+    <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
+  <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
+  <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+</div><input id="password" class="input" type="password" placeholder="Mot de passe">
     <button id="authBtn" class="primary" style="margin-top:14px" onclick="submitAuth()">Se connecter</button>
     <div id="authStatus" class="status"></div>
   </div>
@@ -89,12 +92,11 @@ function validConfig(){
 }
 function authMode(m){document.getElementById('loginTab').classList.toggle('active',m==='login');document.getElementById('signupTab').classList.toggle('active',m==='signup');document.getElementById('signupFields').classList.toggle('hidden',m!=='signup');document.getElementById('authBtn').textContent=m==='login'?'Se connecter':'Créer mon compte';document.getElementById('authBtn').dataset.mode=m}
 function normalizeNzilaPhone(raw){
-  let p=(raw||'').replace(/[\s().-]/g,'');
-  if(p.startsWith('00')) p='+'+p.slice(2);
-  if(p.startsWith('242')) p='+'+p;
-  if(p.startsWith('0')) p='+242'+p.slice(1);
-  if(!/^\+242[0-9]{8,9}$/.test(p)) return null;
-  return p;
+  let digits=(raw||'').replace(/\D/g,'');
+  if(digits.startsWith('242')) digits=digits.slice(3);
+  if(digits.startsWith('0')) digits=digits.slice(1);
+  if(!/^[0-9]{8,9}$/.test(digits)) return null;
+  return '+242'+digits;
 }
 function nzilaClientAccounts(){try{return JSON.parse(localStorage.getItem('nzila_client_accounts')||'[]')}catch(e){return []}}
 function saveNzilaClientAccounts(a){localStorage.setItem('nzila_client_accounts',JSON.stringify(a))}
@@ -106,13 +108,28 @@ async function submitAuth(){
   if(password.length<6){setAuthStatus('Le mot de passe doit contenir au moins 6 caractères.');return}
   const accounts=nzilaClientAccounts();
   if(mode==='signup'){
-    const first_name=document.getElementById('firstName').value.trim(),last_name=document.getElementById('lastName').value.trim();
+    const first_name=document.getElementById('firstName').value.trim();
+    const last_name=document.getElementById('lastName').value.trim();
     if(!first_name||!last_name){setAuthStatus('Prénom et nom requis.');return}
-    if(accounts.some(a=>a.phone===phone)){setAuthStatus('Un compte existe déjà avec ce numéro.');return}
-    const u={id:'local-client-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),phone,first_name,last_name,role:'client',created_at:new Date().toISOString()};
-    accounts.push({...u,password});saveNzilaClientAccounts(accounts);
+    if(accounts.some(a=>a.phone===phone)){
+      setAuthStatus('Ce numéro est déjà utilisé. Connectez-vous avec ce numéro.');
+      return;
+    }
+
+    const u={
+      id:'local-client-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),
+      phone,first_name,last_name,role:'client',
+      created_at:new Date().toISOString()
+    };
+
+    accounts.push({...u,password});
+    saveNzilaClientAccounts(accounts);
     localStorage.setItem('nzila_client_session',JSON.stringify(u));
-    setAuthStatus('Compte NZILA créé.');await boot(u);return;
+
+    // Aucune validation : ouverture immédiate de l'accueil.
+    await boot(u);
+    openPage('home');
+    return;
   }
   const a=accounts.find(a=>a.phone===phone&&a.password===password);
   if(!a){setAuthStatus('Numéro ou mot de passe incorrect.');return}

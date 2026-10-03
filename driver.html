@@ -56,7 +56,10 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
     </div>
 
     <div id="loginForm">
-      
+      <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
+        <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
+        <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+      </div>
       <input id="password" class="input" type="password" placeholder="Mot de passe" style="margin-top:8px">
       <button class="primary" style="margin-top:12px" onclick="login()">Entrer dans le cockpit</button>
     </div>
@@ -71,8 +74,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
         <input id="aFirst" class="input" placeholder="Prénom" style="margin-top:8px">
         <input id="aLast" class="input" placeholder="Nom" style="margin-top:8px">
       </div>
-      <input id="aPhone" class="input" placeholder="Téléphone" style="margin-top:8px">
-      <input id="aLicense" class="input" placeholder="Numéro de permis" style="margin-top:8px">
+            <input id="aLicense" class="input" placeholder="Numéro de permis" style="margin-top:8px">
       <div class="grid">
         <input id="aMake" class="input" placeholder="Marque" style="margin-top:8px">
         <input id="aModel" class="input" placeholder="Modèle" style="margin-top:8px">
@@ -283,20 +285,21 @@ async function applyDriver(){
     total_rides:0
   };
 
+  // Redirection obligatoire : l'inscription est terminée, on ouvre immédiatement l'accueil.
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-
-  renderProfile();
-  renderOnline();
-  initMap();
-  loadDashboard();
-  loadMyRides();
-  loadWallet();
-  loadDocuments();
-  loadNotifications();
-  subscribe();
-
   if(typeof openPage==='function') openPage('home');
+
+  // Le reste du cockpit se charge après la redirection et ne peut pas la bloquer.
+  try{renderProfile();}catch(e){}
+  try{renderOnline();}catch(e){}
+  try{initMap();}catch(e){}
+  Promise.resolve().then(()=>loadDashboard()).catch(()=>{});
+  Promise.resolve().then(()=>loadMyRides()).catch(()=>{});
+  Promise.resolve().then(()=>loadWallet()).catch(()=>{});
+  Promise.resolve().then(()=>loadDocuments()).catch(()=>{});
+  Promise.resolve().then(()=>loadNotifications()).catch(()=>{});
+  try{subscribe();}catch(e){}
 }
 async function boot(u){
   user=u;profile={id:u.id,first_name:u.first_name||'',last_name:u.last_name||'',phone:u.phone||'',role:'driver',is_active:true};

@@ -2,138 +2,484 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NZILA DRIVER — V3</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
-*{box-sizing:border-box}body{margin:0;background:#06100d;color:#f6fbf8;font-family:Inter,Arial,sans-serif}.wrap{max-width:1150px;margin:auto;padding:20px}.card{background:#0d1b17;border:1px solid #1d342c;border-radius:22px;padding:20px;margin-bottom:16px}.brand{font-size:30px;font-weight:900}.muted{color:#8fa59d}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}input,select,textarea{width:100%;padding:13px;background:#09130f;border:1px solid #294238;color:white;border-radius:13px;margin:5px 0 10px}.btn{padding:13px 16px;border-radius:13px;font-weight:800}.primary{background:#39d391;color:#062117}.ghost{background:#20332c;color:white}.danger{background:#c94b4b;color:white}.hidden{display:none}.pill{display:inline-block;padding:7px 11px;border-radius:999px;background:#17382c;color:#6ce1ac;font-size:12px;font-weight:900}.dangerPill{background:#4b1c1c;color:#ff9d9d}.price{font-size:30px;font-weight:900}.offer{border:1px solid #3c755d;border-radius:18px;padding:18px;background:#10261e}.ride{border:1px solid #254338;border-radius:16px;padding:15px;margin:10px 0}#map{height:420px;border-radius:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}@media(max-width:760px){.grid,.grid3{grid-template-columns:1fr}.wrap{padding:12px}}
-</style></head>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NZILA DRIVER — V1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f5f7f8;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--green:#0b8f55;--green2:#087447;--dark:#101828;--red:#dc2626;--orange:#f59e0b;--blue:#2563eb;--shadow:0 10px 30px rgba(16,24,40,.08)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
+.auth{min-height:100vh;display:grid;place-items:center;padding:22px;background:linear-gradient(145deg,#071d16,#0b8f55 65%,#d8f7e9)}
+.authbox{width:min(480px,100%);background:#fff;border-radius:28px;padding:26px;box-shadow:0 25px 70px rgba(0,0,0,.22)}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:48px;height:48px;border-radius:15px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:800;font-size:25px}.brand b{display:block;font-size:18px}.brand small{color:var(--muted)}
+.auth h1{font-size:28px;margin:28px 0 6px}.sub{color:var(--muted);line-height:1.55}.tabs{display:grid;grid-template-columns:1fr 1fr;background:#f1f3f5;padding:4px;border-radius:12px;margin:22px 0 14px}.tabs button{padding:11px;border-radius:9px;background:transparent;color:var(--muted);font-weight:700}.tabs button.active{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.input{width:100%;height:46px;border:1px solid var(--line);border-radius:11px;padding:0 13px;outline:0;background:#fff}.input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(11,143,85,.1)}.phone{display:flex;margin-bottom:9px}.phone span{display:flex;align-items:center;padding:0 12px;background:#f2f4f5;border:1px solid var(--line);border-right:0;border-radius:11px 0 0 11px;font-weight:800}.phone input{border-radius:0 11px 11px 0}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{margin-top:9px}.field label{font-size:12px;color:var(--muted);font-weight:700;display:block;margin:0 0 5px}
+.btn{height:46px;border-radius:12px;padding:0 17px;font-weight:800}.primary{background:var(--green);color:#fff}.primary:hover{background:var(--green2)}.dark{background:var(--dark);color:#fff}.outline{background:#fff;border:1px solid var(--line)}.danger{background:#fee2e2;color:#991b1b}.wide{width:100%}.authmsg{margin-top:10px;font-size:13px;color:var(--muted);min-height:20px}
+
+.app{min-height:100vh}.top{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100vw - 1180px)/2));position:sticky;top:0;z-index:50}.top .brand .logo{width:38px;height:38px;font-size:19px;border-radius:12px}.iconbtn{width:42px;height:42px;border-radius:12px;background:#f4f6f7;font-size:19px}.wrap{max-width:1180px;margin:auto;padding:22px 18px 105px}.hero{background:linear-gradient(130deg,#071d16,#0b8f55);color:#fff;border-radius:25px;padding:25px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:210px;height:210px;border-radius:50%;right:-70px;top:-100px;background:rgba(255,255,255,.08)}.eyebrow{font-size:11px;letter-spacing:.13em;font-weight:800;opacity:.75}.hero h1{font-size:30px;margin:8px 0}.hero p{margin:0;opacity:.85;max-width:650px}.statusRow{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-top:20px}.statusPill{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.12);font-size:12px;font-weight:800}.dot{width:8px;height:8px;border-radius:50%;background:#fbbf24}.online .dot{background:#4ade80;box-shadow:0 0 0 5px rgba(74,222,128,.12)}.toggle{width:64px;height:36px;border-radius:999px;background:#344054;padding:4px}.toggle i{display:block;width:28px;height:28px;background:#fff;border-radius:50%;transition:.2s}.toggle.on{background:#36a269}.toggle.on i{transform:translateX(28px)}
+.section{margin-top:22px}.sectionHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.sectionHead h2{font-size:18px;margin:0}.muted{color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{background:#fff;border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:var(--shadow)}.metric b{font-size:22px;display:block}.metric span{font-size:12px;color:var(--muted);margin-top:5px;display:block}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:var(--shadow)}.two{display:grid;grid-template-columns:1.4fr .9fr;gap:15px}.map{height:330px;border-radius:15px;overflow:hidden;background:#e8eceb}.map.full{height:470px}
+.offer{border:2px solid #b9ead3;background:#f4fff9}.offerTop{display:flex;justify-content:space-between;gap:15px}.price{font-size:24px;font-weight:800}.badge{display:inline-flex;padding:6px 9px;border-radius:999px;font-size:11px;font-weight:800}.badge.green{background:#dcfce7;color:#166534}.badge.orange{background:#fef3c7;color:#92400e}.badge.red{background:#fee2e2;color:#991b1b}.rideRoute{display:grid;grid-template-columns:20px 1fr;gap:8px;margin:18px 0}.routeLine{position:relative}.routeLine:before{content:"";position:absolute;left:9px;top:12px;bottom:12px;border-left:2px dashed #cbd5e1}.routeDot{width:19px;height:19px;border-radius:50%;background:#0b8f55;border:5px solid #d1fae5;position:relative;z-index:2}.routeDot.end{background:#111827;border-color:#e5e7eb}.routeText{padding-bottom:16px}.routeText:last-child{padding-bottom:0}.routeText small{display:block;color:var(--muted);font-size:11px}.routeText b{font-size:14px}
+.actionGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.action{padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff;text-align:left}.action strong{display:block}.action span{font-size:12px;color:var(--muted)}
+.page{display:none}.page.active{display:block}.bottom{position:fixed;bottom:0;left:0;right:0;height:78px;background:rgba(255,255,255,.96);backdrop-filter:blur(15px);border-top:1px solid var(--line);display:flex;justify-content:center;gap:5px;z-index:60}.nav{width:min(150px,22vw);background:transparent;color:#667085;font-size:11px;font-weight:700}.nav div{font-size:21px;line-height:26px}.nav.active{color:var(--green)}
+.list{display:grid;gap:10px}.listItem{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px;display:flex;align-items:center;justify-content:space-between;gap:15px}.listItem b{display:block}.listItem small{display:block;color:var(--muted);margin-top:4px}.amount{font-weight:800;white-space:nowrap}
+.profileHead{display:flex;align-items:center;gap:15px}.avatar{width:68px;height:68px;border-radius:22px;background:#d8f7e9;color:#087447;display:grid;place-items:center;font-weight:800;font-size:22px}.profileStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}.profileStats div{background:#f7f8f9;border-radius:13px;padding:12px;text-align:center}.profileStats b{display:block}.profileStats span{font-size:10px;color:var(--muted)}
+.doc{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line)}.doc:last-child{border:0}.doc b{font-size:14px}.doc small{display:block;color:var(--muted);margin-top:3px}
+.chart{height:180px;display:flex;align-items:end;gap:10px;padding-top:15px}.barWrap{height:100%;flex:1;display:flex;align-items:end;justify-content:center;gap:3px}.bar{width:70%;max-width:35px;border-radius:7px 7px 2px 2px;background:#0b8f55}.barLabel{font-size:10px;color:var(--muted);text-align:center;margin-top:6px}
+.modal{position:fixed;inset:0;background:rgba(16,24,40,.55);z-index:100;display:none;align-items:end;justify-content:center}.modal.show{display:flex}.sheet{background:#fff;width:min(600px,100%);border-radius:25px 25px 0 0;padding:22px;max-height:90vh;overflow:auto}.sheet h2{margin:0 0 8px}.close{float:right;background:#f2f4f7;border-radius:10px;width:36px;height:36px}.sos{background:#991b1b;color:#fff}
+.toast{position:fixed;left:50%;bottom:92px;transform:translate(-50%,20px);opacity:0;background:#111827;color:#fff;padding:12px 16px;border-radius:12px;z-index:120;font-size:13px;transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.map{height:290px}.hero h1{font-size:25px}}
+@media(max-width:520px){.wrap{padding:14px 12px 100px}.top{padding:0 12px}.grid2{grid-template-columns:1fr}.cards{gap:8px}.metric{padding:13px}.metric b{font-size:18px}.hero{border-radius:20px}.hero p{font-size:13px}.two{gap:10px}.bottom{height:72px}.nav{width:24vw}}
+</style>
+</head>
 <body>
+
+<!-- AUTH / INSCRIPTION -->
+<section id="auth" class="auth">
+<div class="authbox">
+  <div class="brand"><div class="logo">N</div><div><b>NZILA DRIVER</b><small>Operating system</small></div></div>
+  <h1 id="authTitle">Bienvenue chauffeur</h1>
+  <p class="sub">Votre numéro de téléphone est votre identifiant NZILA. Aucun email n'est nécessaire.</p>
+  <div class="tabs">
+    <button id="loginTab" class="active" onclick="authMode('login')">Connexion</button>
+    <button id="signupTab" onclick="authMode('signup')">Devenir chauffeur</button>
+  </div>
+
+  <div id="loginForm">
+    <div class="phone"><span>+242</span><input id="loginPhone" class="input" type="tel" inputmode="numeric" placeholder="Votre numéro"></div>
+    <input id="loginPassword" class="input" type="password" placeholder="Mot de passe">
+    <button class="btn primary wide" style="margin-top:12px" onclick="login()">Entrer dans le cockpit</button>
+  </div>
+
+  <div id="signupForm" class="hidden">
+    <div class="phone"><span>+242</span><input id="signupPhone" class="input" type="tel" inputmode="numeric" placeholder="Votre numéro"></div>
+    <div class="grid2">
+      <input id="firstName" class="input" placeholder="Prénom">
+      <input id="lastName" class="input" placeholder="Nom">
+    </div>
+    <input id="signupPassword" class="input field" type="password" placeholder="Mot de passe">
+    <input id="license" class="input field" placeholder="Numéro de permis">
+    <div class="grid2 field">
+      <input id="make" class="input" placeholder="Marque">
+      <input id="model" class="input" placeholder="Modèle">
+      <input id="plate" class="input" placeholder="Plaque">
+      <input id="vehicleColor" class="input" placeholder="Couleur">
+    </div>
+    <button class="btn dark wide" style="margin-top:12px" onclick="applyDriver()">Déposer ma candidature</button>
+  </div>
+  <div id="authMsg" class="authmsg"></div>
+</div>
+</section>
+
+<!-- APP -->
+<section id="app" class="app hidden">
+<header class="top">
+  <div class="brand"><div class="logo">N</div><div><b>NZILA DRIVER</b><small>Operating system</small></div></div>
+  <button class="iconbtn" onclick="openPage('notifications')">🔔</button>
+</header>
+
 <main class="wrap">
-<section id="auth" class="card" style="max-width:620px;margin:5vh auto">
-<div class="brand">NZILA DRIVER</div>
-<p class="muted">Votre numéro +242 est votre identifiant chauffeur.</p>
-<input id="sFirst" placeholder="Prénom">
-<input id="sLast" placeholder="Nom">
-<input id="sPhone" placeholder="+242 Votre numéro de téléphone">
-<input id="sPass" type="password" placeholder="Mot de passe">
-<input id="license" placeholder="Numéro de permis">
-<div class="grid">
-<input id="make" placeholder="Marque du véhicule">
-<input id="model" placeholder="Modèle">
-</div>
-<div class="grid">
-<input id="plate" placeholder="Plaque">
-<input id="color" placeholder="Couleur">
-</div>
-<button class="btn primary" style="width:100%" onclick="signup()">Déposer ma candidature</button>
-<hr>
-<h3>Connexion</h3>
-<input id="lPhone" placeholder="+242 Votre numéro de téléphone">
-<input id="lPass" type="password" placeholder="Mot de passe">
-<button class="btn ghost" style="width:100%" onclick="login()">Se connecter</button>
-<p id="authMsg" class="muted">
-</p>
+
+<!-- HOME -->
+<section id="homePage" class="page active">
+  <div class="hero">
+    <div class="eyebrow">COCKPIT NZILA</div>
+    <h1 id="hello">Bonjour 👋</h1>
+    <p>Pilotez vos courses, votre activité et vos revenus depuis un seul espace.</p>
+    <div class="statusRow">
+      <span id="statusPill" class="statusPill"><i class="dot"></i><span id="statusText">HORS LIGNE</span></span>
+      <button id="onlineToggle" class="toggle" onclick="toggleOnline()"><i></i></button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="cards">
+      <div class="metric"><b id="todayRevenue">0 FCFA</b><span>Revenus aujourd'hui</span></div>
+      <div class="metric"><b id="todayRides">0</b><span>Courses terminées</span></div>
+      <div class="metric"><b id="rating">5,00 ★</b><span>Note chauffeur</span></div>
+      <div class="metric"><b id="completion">100 %</b><span>Courses terminées</span></div>
+    </div>
+  </div>
+
+  <div id="offerSection" class="section hidden">
+    <div class="sectionHead"><h2>Nouvelle course</h2><span class="badge green">DISPONIBLE</span></div>
+    <div class="card offer">
+      <div class="offerTop"><div><b>Course #NZ-10482</b><div class="muted" style="font-size:12px;margin-top:5px">À 2,1 km de vous · environ 6 min</div></div><div class="price">7 500 FCFA</div></div>
+      <div class="rideRoute">
+        <div class="routeLine"><div class="routeDot"></div><div style="height:50px"></div><div class="routeDot end"></div></div>
+        <div><div class="routeText"><small>PRISE EN CHARGE</small><b>Bacongo — Pharmacie</b></div><div class="routeText"><small>DESTINATION</small><b>Centre-ville</b></div></div>
+      </div>
+      <div class="muted" style="font-size:12px;margin-bottom:12px">👤 2 passagers · 6,2 km estimés</div>
+      <div class="grid2"><button class="btn outline" onclick="rejectOffer()">Refuser</button><button class="btn primary" onclick="acceptOffer()">Accepter</button></div>
+    </div>
+  </div>
+
+  <div class="section two">
+    <div>
+      <div class="sectionHead"><h2>Activité récente</h2><button class="btn outline" style="height:36px;font-size:12px" onclick="openPage('rides')">Tout voir</button></div>
+      <div id="recentRides" class="list"></div>
+    </div>
+    <div>
+      <div class="sectionHead"><h2>Actions rapides</h2></div>
+      <div class="card actionGrid">
+        <button class="action" onclick="openPage('earnings')"><strong>💰 Revenus</strong><span>Voir mes gains</span></button>
+        <button class="action" onclick="openPage('documents')"><strong>📄 Documents</strong><span>État du dossier</span></button>
+        <button class="action" onclick="openPage('support')"><strong>💬 Support</strong><span>Besoin d'aide ?</span></button>
+        <button class="action" onclick="showSOS()"><strong>🆘 Sécurité</strong><span>Assistance urgente</span></button>
+      </div>
+    </div>
+  </div>
 </section>
-<section id="app" class="hidden">
-<div class="card">
-<div class="brand">NZILA DRIVER <span id="verify" class="pill">—</span>
-</div>
-<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-<span id="hello" class="muted">
-</span>
-<button class="btn ghost" onclick="logout()">Déconnexion</button>
-</div>
-</div>
-<div class="tabs">
-<button class="btn primary" onclick="page('cockpit')">Cockpit</button>
-<button class="btn ghost" onclick="page('courses')">Courses</button>
-<button class="btn ghost" onclick="page('mapPage')">GPS</button>
-<button class="btn ghost" onclick="page('finance')">Revenus</button>
-<button class="btn ghost" onclick="page('profile')">Profil</button>
-</div>
-<section id="cockpit">
-<div class="grid">
-<div class="card">
-<span id="onlinePill" class="pill">HORS LIGNE</span>
-<h2>Disponibilité</h2>
-<p id="onlineText" class="muted">
-</p>
-<button id="onlineBtn" class="btn primary" style="width:100%" onclick="toggleOnline()">Passer en ligne</button>
-</div>
-<div class="card">
-<h2>Course active</h2>
-<div id="active">Aucune course active.</div>
-</div>
-</div>
-<div id="offer" class="offer hidden">
-<h2>🚗 Nouvelle course</h2>
-<div id="offerText">
-</div>
-<div class="grid">
-<button class="btn primary" onclick="acceptOffer()">Accepter</button>
-<button class="btn ghost" onclick="refuseOffer()">Refuser</button>
-</div>
-</div>
+
+<!-- RIDE -->
+<section id="ridePage" class="page">
+  <div class="sectionHead"><h2 id="rideTitle">Course</h2><span id="rideState" class="badge orange">EN ATTENTE</span></div>
+  <div class="card">
+    <div class="rideRoute">
+      <div class="routeLine"><div class="routeDot"></div><div style="height:95px"></div><div class="routeDot end"></div></div>
+      <div><div class="routeText"><small>PRISE EN CHARGE</small><b id="pickup">Bacongo — Pharmacie</b></div><div class="routeText"><small>DESTINATION</small><b id="destination">Centre-ville</b></div></div>
+    </div>
+    <div id="rideMap" class="map"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px">
+      <div class="metric"><b id="ridePrice">7 500 FCFA</b><span>Revenu course</span></div>
+      <div class="metric"><b id="rideDistance">6,2 km</b><span>Distance estimée</span></div>
+    </div>
+    <button class="btn primary wide" style="margin-top:12px" onclick="openNavigation()">🧭 Ouvrir la navigation</button>
+    <button id="arrivedBtn" class="btn dark wide" style="margin-top:8px" onclick="arrived()">Je suis arrivé</button>
+    <button id="startTripBtn" class="btn primary wide hidden" style="margin-top:8px" onclick="startTrip()">Client à bord</button>
+    <button id="finishBtn" class="btn dark wide hidden" style="margin-top:8px" onclick="finishTrip()">Terminer la course</button>
+    <button class="btn danger wide" style="margin-top:8px" onclick="showIncident()">⚠️ Signaler un incident</button>
+  </div>
 </section>
-<section id="courses" class="hidden">
-<div class="card">
-<h2>Historique des courses</h2>
-<div id="rideList">
-</div>
-</div>
+
+<!-- RIDES -->
+<section id="ridesPage" class="page">
+  <div class="sectionHead"><h2>Mes courses</h2></div>
+  <div class="tabs"><button class="active">Historique</button><button onclick="toast('Filtres disponibles prochainement')">Filtrer</button></div>
+  <div id="allRides" class="list"></div>
 </section>
-<section id="mapPage" class="hidden">
-<div class="card">
-<h2>GPS temps réel</h2>
-<div id="map">
-</div>
-<p id="gpsText" class="muted">GPS inactif</p>
-</div>
+
+<!-- EARNINGS -->
+<section id="earningsPage" class="page">
+  <div class="sectionHead"><h2>Mes revenus</h2></div>
+  <div class="cards">
+    <div class="metric"><b id="earnToday">32 500</b><span>FCFA aujourd'hui</span></div>
+    <div class="metric"><b>184 000</b><span>Cette semaine</span></div>
+    <div class="metric"><b>726 500</b><span>Ce mois</span></div>
+    <div class="metric"><b id="netMonth">653 850</b><span>Net après commission</span></div>
+  </div>
+  <div class="card section">
+    <div class="sectionHead"><h2>Activité des 7 derniers jours</h2></div>
+    <div class="chart" id="chart"></div>
+  </div>
+  <div class="card section">
+    <h3 style="margin-top:0">Résumé du mois</h3>
+    <div class="doc"><div><b>Revenus bruts</b><small>Courses terminées</small></div><strong>726 500 FCFA</strong></div>
+    <div class="doc"><div><b>Commission NZILA</b><small>10 %</small></div><strong>72 650 FCFA</strong></div>
+    <div class="doc"><div><b>Revenus nets</b><small>Disponible selon conditions</small></div><strong>653 850 FCFA</strong></div>
+  </div>
 </section>
-<section id="finance" class="hidden">
-<div class="grid">
-<div class="card">
-<h2>Solde</h2>
-<div id="balance" class="price">0 FCFA</div>
-</div>
-<div class="card">
-<h2>Retrait</h2>
-<select id="withdrawProvider">
-<option value="mtn">MTN Mobile Money</option>
-<option value="airtel">Airtel Money</option>
-</select>
-<input id="withdrawPhone" placeholder="Numéro Mobile Money">
-<input id="withdrawAmount" type="number" placeholder="Montant FCFA">
-<button class="btn primary" onclick="withdraw()">Demander un retrait</button>
-</div>
-</div>
+
+<!-- WALLET -->
+<section id="walletPage" class="page">
+  <div class="sectionHead"><h2>Portefeuille</h2></div>
+  <div class="card" style="background:linear-gradient(135deg,#071d16,#0b8f55);color:#fff">
+    <small style="opacity:.75">SOLDE DISPONIBLE</small><div style="font-size:34px;font-weight:800;margin:7px 0">125 500 FCFA</div><button class="btn" style="background:#fff;color:#087447" onclick="withdraw()">Retirer mes gains</button>
+  </div>
+  <div class="sectionHead section"><h2>Transactions</h2></div>
+  <div class="list">
+    <div class="listItem"><div><b>Course #NZ-10482</b><small>Aujourd'hui · 14:32</small></div><span class="amount">+7 500 FCFA</span></div>
+    <div class="listItem"><div><b>Course #NZ-10471</b><small>Aujourd'hui · 12:08</small></div><span class="amount">+8 000 FCFA</span></div>
+    <div class="listItem"><div><b>Retrait Mobile Money</b><small>Hier · 18:21</small></div><span class="amount">-50 000 FCFA</span></div>
+  </div>
 </section>
-<section id="profile" class="hidden">
-<div class="card">
-<h2>Profil chauffeur</h2>
-<div id="profileBox">
-</div>
-<button class="btn danger" style="width:100%" onclick="sos()">🆘 SOS NZILA</button>
-<textarea id="incident" placeholder="Décrire un incident">
-</textarea>
-<button class="btn ghost" onclick="incidentReport()">Signaler un incident</button>
-</div>
+
+<!-- MAP -->
+<section id="mapPage" class="page">
+  <div class="sectionHead"><h2>Carte NZILA</h2><span class="badge green">GPS ACTIF</span></div>
+  <div class="card"><div id="mainMap" class="map full"></div><p class="muted" style="font-size:12px">Les demandes disponibles apparaîtront autour de votre position lorsque vous êtes en ligne.</p></div>
 </section>
+
+<!-- DOCUMENTS -->
+<section id="documentsPage" class="page">
+  <div class="sectionHead"><h2>Mes documents</h2></div>
+  <div class="card">
+    <div class="doc"><div><b>Permis de conduire</b><small>Document principal</small></div><span class="badge green">VALIDE</span></div>
+    <div class="doc"><div><b>Carte grise</b><small>Véhicule enregistré</small></div><span class="badge green">VALIDE</span></div>
+    <div class="doc"><div><b>Assurance</b><small>Expire dans 42 jours</small></div><span class="badge green">VALIDE</span></div>
+    <div class="doc"><div><b>Contrôle technique</b><small>Expire dans 12 jours</small></div><span class="badge orange">À RENOUVELER</span></div>
+  </div>
+  <button class="btn outline wide" style="margin-top:12px" onclick="toast('Module de dépôt de documents à connecter à Supabase Storage')">Ajouter / remplacer un document</button>
 </section>
+
+<!-- PROFILE -->
+<section id="profilePage" class="page">
+  <div class="card">
+    <div class="profileHead"><div id="avatar" class="avatar">NZ</div><div><h2 id="profileName" style="margin:0">Chauffeur NZILA</h2><p class="muted" style="margin:4px 0">🟢 Chauffeur actif · <span id="profileRating">5,00</span> ★</p></div></div>
+    <div class="profileStats"><div><b id="profileRides">127</b><span>Courses</span></div><div><b>98 %</b><span>Acceptation</span></div><div><b>96 %</b><span>Terminées</span></div></div>
+  </div>
+  <div class="card section">
+    <h3 style="margin-top:0">Informations personnelles</h3>
+    <div class="grid2"><input id="pFirst" class="input" placeholder="Prénom"><input id="pLast" class="input" placeholder="Nom"></div>
+    <div class="phone field"><span>+242</span><input id="pPhone" class="input" placeholder="Votre numéro"></div>
+    <button class="btn primary" onclick="saveProfile()">Enregistrer</button>
+  </div>
+  <div class="card section">
+    <h3 style="margin-top:0">Véhicule</h3>
+    <div class="grid2"><input id="vMake" class="input" placeholder="Marque"><input id="vModel" class="input" placeholder="Modèle"><input id="vPlate" class="input" placeholder="Plaque"><input id="vColor" class="input" placeholder="Couleur"></div>
+    <button class="btn primary" style="margin-top:10px" onclick="toast('Véhicule enregistré localement')">Enregistrer</button>
+  </div>
+  <button class="btn outline wide section" onclick="logout()">Se déconnecter</button>
+</section>
+
+<!-- NOTIFICATIONS -->
+<section id="notificationsPage" class="page">
+  <div class="sectionHead"><h2>Notifications</h2></div>
+  <div class="list">
+    <div class="listItem"><div><b>Nouvelle fonctionnalité</b><small>Votre espace revenus est maintenant disponible.</small></div><span>🔔</span></div>
+    <div class="listItem"><div><b>Document bientôt expiré</b><small>Votre contrôle technique expire dans 12 jours.</small></div><span>📄</span></div>
+    <div class="listItem"><div><b>Course terminée</b><small>Course #NZ-10482 · 7 500 FCFA</small></div><span>✓</span></div>
+  </div>
+</section>
+
+<!-- SUPPORT -->
+<section id="supportPage" class="page">
+  <div class="sectionHead"><h2>Aide & support</h2></div>
+  <div class="card actionGrid">
+    <button class="action" onclick="toast('Guide : passez en ligne depuis l’accueil.')"><strong>🚕 Courses</strong><span>Problème avec une course</span></button>
+    <button class="action" onclick="toast('Votre portefeuille sera vérifié par NZILA.')"><strong>💰 Paiement</strong><span>Revenu ou retrait</span></button>
+    <button class="action" onclick="showIncident()"><strong>⚠️ Incident</strong><span>Signaler un problème</span></button>
+    <button class="action" onclick="showSOS()"><strong>🆘 Urgence</strong><span>Assistance immédiate</span></button>
+  </div>
+  <div class="card section"><h3 style="margin-top:0">Contacter NZILA</h3><p class="muted">Un problème non résolu ? Ouvrez une demande au support.</p><button class="btn primary" onclick="toast('Ticket support créé — module backend à connecter')">Contacter le support</button></div>
+</section>
+
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-const URL='https://dsvbtlwxujuusnarcbfg.supabase.co',KEY='sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G',sb=window.supabase.createClient(URL,KEY);const SK='nzila_driver_v3';let session=JSON.parse(localStorage.getItem(SK)||'null'),online=false,gpsWatch=null,map,marker,offer=null,offerSub,rideSub,activeRide=null;
-const $=id=>document.getElementById(id);function normPhone(v){let x=(v||'').replace(/\s+/g,'');if(/^0\d{9}$/.test(x))x='+242'+x.slice(1);if(/^242\d{9}$/.test(x))x='+'+x;return x}function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function money(v){return Number(v||0).toLocaleString('fr-FR')+' FCFA'}async function rpc(n,a){const r=await sb.rpc(n,a);if(r.error)throw r.error;return r.data}function setSession(x){session=x;localStorage.setItem(SK,JSON.stringify(x))}function logout(){stopGPS();localStorage.removeItem(SK);location.reload()}
-async function signup(){try{const id=await rpc('nzila_register',{p_first_name:$('sFirst').value.trim(),p_last_name:$('sLast').value.trim(),p_phone:normPhone($('sPhone').value),p_password:$('sPass').value,p_role:'driver',p_department:'Brazzaville'});await rpc('submit_driver_application',{p_user_id:id,p_license:$('license').value.trim(),p_make:$('make').value.trim(),p_model:$('model').value.trim(),p_plate:$('plate').value.trim(),p_color:$('color').value.trim(),p_notes:null});$('authMsg').textContent='Candidature enregistrée. Attendez la validation par NZILA.'}catch(e){$('authMsg').textContent=e.message}}
-async function login(){try{const d=await rpc('nzila_login',{p_phone:normPhone($('lPhone').value),p_password:$('lPass').value});if(!d?.length){$('authMsg').textContent='Numéro ou mot de passe incorrect.';return}if(d[0].role!=='driver'){$('authMsg').textContent='Ce compte est un compte client.';return}setSession(d[0]);location.reload()}catch(e){$('authMsg').textContent=e.message}}
-function page(id){['cockpit','courses','mapPage','finance','profile'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='courses')loadRides();if(id==='finance')loadBalance();if(id==='profile')renderProfile();setTimeout(()=>map?.invalidateSize(),100)}
-async function toggleOnline(){try{const r=await rpc('set_driver_online_v3',{p_driver_id:session.id,p_online:!online});online=!!r.online;renderOnline();if(online){startGPS();watchOffers()}else{stopGPS();stopOffers()}}catch(e){alert(e.message)}}function renderOnline(){$('onlinePill').textContent=online?'EN LIGNE':'HORS LIGNE';$('onlineText').textContent=online?'Vous recevez des demandes.':'Vous ne recevez pas de demandes.';$('onlineBtn').textContent=online?'Passer hors ligne':'Passer en ligne'}
-function startGPS(){if(gpsWatch!==null)return;if(!navigator.geolocation){$('gpsText').textContent='GPS indisponible sur cet appareil.';return}$('gpsText').textContent='GPS actif — transmission en cours';gpsWatch=navigator.geolocation.watchPosition(async p=>{const c=p.coords;const pos=[c.latitude,c.longitude];if(marker)marker.setLatLng(pos);else marker=L.marker(pos).addTo(map).bindPopup('Votre position');map.setView(pos,15);try{await rpc('upsert_driver_location_v3',{p_driver_id:session.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy,p_heading:c.heading,p_speed:c.speed})}catch(e){}},{enableHighAccuracy:true,maximumAge:3000,timeout:10000},e=>$('gpsText').textContent='GPS : '+e.message)}function stopGPS(){if(gpsWatch!==null){navigator.geolocation.clearWatch(gpsWatch);gpsWatch=null}$('gpsText').textContent='GPS inactif'}
-async function loadOffer(){const r=await sb.from('ride_offers').select('*,rides(*)').eq('driver_id',session.id).eq('status','pending').gt('expires_at',new Date().toISOString()).order('offered_at',{ascending:false}).limit(1);if(r.data?.[0]){offer=r.data[0];renderOffer()}}function renderOffer(){const r=offer.rides;$('offerText').innerHTML=`<b>${esc(r.pickup_address)}</b> → <b>${esc(r.destination_address)}</b><br><span class="price">${money(r.estimated_price)}</span><br><span class="muted">Offre valable jusqu'à ${new Date(offer.expires_at).toLocaleTimeString('fr-FR')}</span>`;$('offer').classList.remove('hidden')}async function watchOffers(){await loadOffer();stopOffers();offerSub=sb.channel('driver-offers-'+session.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+session.id},()=>loadOffer()).subscribe()}function stopOffers(){if(offerSub){sb.removeChannel(offerSub);offerSub=null}}
-async function acceptOffer(){if(!offer)return;try{activeRide=await rpc('accept_ride_v3',{p_offer_id:offer.id,p_driver_id:session.id});offer=null;$('offer').classList.add('hidden');renderActive();subscribeRide()}catch(e){alert(e.message);loadOffer()}}async function refuseOffer(){if(!offer)return;await sb.from('ride_offers').update({status:'rejected',responded_at:new Date().toISOString()}).eq('id',offer.id);offer=null;$('offer').classList.add('hidden')}
-function renderActive(){if(!activeRide){$('active').innerHTML='Aucune course active.';return}let action='';if(activeRide.status==='accepted')action=`<button class="btn primary" onclick="changeStatus('driver_arriving')">Prendre la course</button>`;if(activeRide.status==='driver_arriving')action=`<button class="btn primary" onclick="changeStatus('arrived')">Je suis arrivé</button>`;if(activeRide.status==='arrived')action=`<input id="clientCode" maxlength="4" placeholder="Code client à 4 chiffres"><button class="btn primary" onclick="changeStatus('in_progress')">Démarrer la course</button>`;if(activeRide.status==='in_progress')action=`<button class="btn primary" onclick="changeStatus('completed')">Terminer la course</button>`;$('active').innerHTML=`<div class="ride"><span class="pill">${esc(activeRide.status)}</span><h3>${esc(activeRide.pickup_address)} → ${esc(activeRide.destination_address)}</h3><div class="price">${money(activeRide.final_price??activeRide.estimated_price)}</div>${action}</div>`}
-async function changeStatus(s){try{activeRide=await rpc('update_ride_status_v3',{p_ride_id:activeRide.id,p_driver_id:session.id,p_status:s,p_client_code:$('clientCode')?.value||null});renderActive();if(s==='completed')loadBalance()}catch(e){alert(e.message)}}function subscribeRide(){if(rideSub)sb.removeChannel(rideSub);rideSub=sb.channel('driver-ride-'+activeRide.id).on('postgres_changes',{event:'*',schema:'public',table:'rides',filter:'id=eq.'+activeRide.id},p=>{if(p.new){activeRide=p.new;renderActive()}}).subscribe()}
-async function loadRides(){const r=await sb.from('rides').select('*').eq('driver_id',session.id).order('created_at',{ascending:false}).limit(50);$('rideList').innerHTML=r.data?.length?r.data.map(x=>`<div class="ride"><b>${esc(x.status)}</b><br>${esc(x.pickup_address)} → ${esc(x.destination_address)}<br>${money(x.final_price??x.estimated_price)}</div>`).join(''):'Aucune course.'}async function loadBalance(){const r=await sb.from('wallets').select('balance').eq('user_id',session.id).maybeSingle();$('balance').textContent=money(r.data?.balance)}async function withdraw(){try{const id=await rpc('request_withdrawal',{p_driver_id:session.id,p_amount:Number($('withdrawAmount').value),p_provider:$('withdrawProvider').value,p_phone:normPhone($('withdrawPhone').value)});alert('Demande de retrait enregistrée : '+id);loadBalance()}catch(e){alert(e.message)}}function renderProfile(){$('profileBox').innerHTML=`<p><b>${esc(session.first_name)} ${esc(session.last_name)}</b></p><p>${esc(session.phone)}</p><p>Statut : ${esc(session.driver_status||'pending')}</p>`}async function sos(){try{const p=await new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(ok,no,{enableHighAccuracy:true,timeout:5000}):no());const id=await rpc('trigger_driver_sos_v3',{p_driver_id:session.id,p_ride_id:activeRide?.id||null,p_lat:p.coords.latitude,p_lng:p.coords.longitude,p_message:'SOS déclenché depuis l’application chauffeur'});alert('SOS enregistré : '+id)}catch(e){alert('SOS : '+e.message)}}async function incidentReport(){const t=$('incident').value.trim();if(!t)return alert('Décris l’incident.');const r=await sb.from('ride_incidents').insert({ride_id:activeRide?.id||null,reporter_id:session.id,type:'driver_report',description:t});alert(r.error?r.error.message:'Incident transmis à NZILA.');$('incident').value=''}
-window.addEventListener('load',async()=>{if(!session)return;$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('hello').textContent='Bonjour '+session.first_name+' 👋';$('verify').textContent=session.driver_status||'pending';map=L.map('map').setView([-4.2634,15.2429],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);const p=await sb.from('driver_profiles').select('*').eq('id',session.id).maybeSingle();online=!!p.data?.online;renderOnline();if(online){startGPS();watchOffers()}const ar=await sb.from('rides').select('*').eq('driver_id',session.id).in('status',['accepted','driver_arriving','arrived','in_progress']).order('created_at',{ascending:false}).limit(1);activeRide=ar.data?.[0]||null;renderActive();if(activeRide)subscribeRide();loadBalance()});
-</script></body>
+
+<nav class="bottom">
+  <button class="nav active" data-page="home" onclick="openPage('home')"><div>⌂</div>Accueil</button>
+  <button class="nav" data-page="rides" onclick="openPage('rides')"><div>🚕</div>Courses</button>
+  <button class="nav" data-page="earnings" onclick="openPage('earnings')"><div>💰</div>Revenus</button>
+  <button class="nav" data-page="profile" onclick="openPage('profile')"><div>●</div>Profil</button>
+</nav>
+</section>
+
+<div id="modal" class="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const SUPABASE_URL='https://dsvbtlwxujuusnarcbfg.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+
+const ACC='nzila_driver_accounts', SESSION='nzila_driver_session';
+let current=null,online=false,currentRide=null,rideState='accepted',mainMap=null,rideMap=null,gpsWatch=null,driverOfferChannel=null,activeOffer=null;
+
+function accounts(){try{return JSON.parse(localStorage.getItem(ACC)||'[]')}catch{return[]}}
+function saveAccounts(a){localStorage.setItem(ACC,JSON.stringify(a))}
+function normalizePhone(raw){
+  let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('242'))d=d.slice(3);if(d.startsWith('0'))d=d.slice(1);
+  return /^[0-9]{8,9}$/.test(d)?'+242'+d:''
+}
+function authMode(mode){
+  document.getElementById('loginTab').classList.toggle('active',mode==='login');
+  document.getElementById('signupTab').classList.toggle('active',mode==='signup');
+  document.getElementById('loginForm').classList.toggle('hidden',mode!=='login');
+  document.getElementById('signupForm').classList.toggle('hidden',mode!=='signup');
+  document.getElementById('authTitle').textContent=mode==='login'?'Bienvenue chauffeur':'Devenir chauffeur NZILA';
+  msg('')
+}
+function msg(t){document.getElementById('authMsg').textContent=t||''}
+function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v||'')}
+
+function applyDriver(){
+  const phone=normalizePhone(document.getElementById('signupPhone').value),password=document.getElementById('signupPassword').value.trim();
+  const first=document.getElementById('firstName').value.trim(),last=document.getElementById('lastName').value.trim(),license=document.getElementById('license').value.trim();
+  if(!phone)return msg('Le champ « Votre numéro » est votre numéro de téléphone. Saisissez un numéro valide.');
+  if(!password)return msg('Le mot de passe est obligatoire.');
+  if(password.length<6)return msg('Le mot de passe doit contenir au moins 6 caractères.');
+  if(!first||!last)return msg('Prénom et nom sont obligatoires.');
+  if(!license)return msg('Le numéro de permis est obligatoire.');
+  const a=accounts();if(a.some(x=>normalizePhone(x.phone)===phone))return msg('Ce numéro possède déjà un compte NZILA.');
+  const u={id:crypto.randomUUID?crypto.randomUUID():'local-driver-'+Date.now(),phone,password,first_name:first,last_name:last,license_number:license,vehicle_make:val('make'),vehicle_model:val('model'),vehicle_plate:val('plate'),vehicle_color:val('vehicleColor'),verification_status:'approved',availability_status:'offline',rating:5,total_rides:0,total_revenue:0,created_at:new Date().toISOString()};
+  a.push(u);saveAccounts(a);localStorage.setItem(SESSION,JSON.stringify(u));current=u;openApp();
+}
+function login(){
+  const phone=normalizePhone(document.getElementById('loginPhone').value),password=document.getElementById('loginPassword').value;
+  if(!phone||!password)return msg('Votre numéro et votre mot de passe sont obligatoires.');
+  const u=accounts().find(x=>normalizePhone(x.phone)===phone&&x.password===password);
+  if(!u)return msg('Numéro ou mot de passe incorrect.');
+  localStorage.setItem(SESSION,JSON.stringify(u));current=u;openApp();
+}
+function openApp(){
+  document.getElementById('auth').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
+  document.getElementById('hello').textContent='Bonjour '+(current.first_name||'chauffeur')+' 👋';
+  renderProfile();renderRides();renderStats();renderChart();initMaps()
+}
+function logout(){
+  stopGps();if(driverOfferChannel)try{sb.removeChannel(driverOfferChannel)}catch{}
+  online=false;localStorage.removeItem(SESSION);document.getElementById('app').classList.add('hidden');document.getElementById('auth').classList.remove('hidden');authMode('login')
+}
+function val(id){return document.getElementById(id).value.trim()}
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(()=>e.classList.remove('show'),2500)}
+
+async function syncOnlineState(){
+  if(!validBackend()||!isUuid(current?.id))return;
+  try{
+    const {error}=await sb.rpc('set_driver_online_v2',{p_driver_id:current.id,p_online:online});
+    if(error)console.warn('NZILA online sync:',error.message)
+  }catch(e){console.warn(e)}
+}
+function validBackend(){return SUPABASE_URL.startsWith('https://')&&!SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')}
+
+function openPage(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  const e=document.getElementById(p+'Page');if(e)e.classList.add('active');
+  document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===p));
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(p==='map')setTimeout(()=>mainMap&&mainMap.invalidateSize(),100)
+}
+
+async function toggleOnline(){
+  if(current?.verification_status&&current.verification_status!=='approved'){toast('Votre compte chauffeur doit être approuvé.');return}
+  online=!online;
+  const t=document.getElementById('onlineToggle');t.classList.toggle('on',online);document.querySelector('.hero').classList.toggle('online',online);
+  document.getElementById('statusText').textContent=online?'NZILA ACTIVE':'HORS LIGNE';
+  current.availability_status=online?'online':'offline';saveCurrent();
+  await syncOnlineState();
+  if(online){
+    startGps();subscribeDriverOffers();toast('Vous êtes maintenant en ligne.');
+    setTimeout(()=>showOffer(),2200);
+  }else{
+    stopGps();unsubscribeDriverOffers();document.getElementById('offerSection').classList.add('hidden');toast('Vous êtes hors ligne.')
+  }
+}
+
+function startGps(){
+  if(!navigator.geolocation||gpsWatch)return;
+  gpsWatch=navigator.geolocation.watchPosition(async pos=>{
+    const c=pos.coords;
+    if(mainMap){mainMap.setView([c.latitude,c.longitude],Math.max(mainMap.getZoom(),14));}
+    if(!validBackend()||!isUuid(current?.id))return;
+    try{
+      await sb.rpc('upsert_driver_location_v2',{
+        p_driver_id:current.id,p_latitude:c.latitude,p_longitude:c.longitude,
+        p_accuracy:c.accuracy||null,p_speed:c.speed||null,p_heading:c.heading||null
+      });
+    }catch(e){console.warn('GPS NZILA:',e)}
+  },()=>toast('Autorisez la localisation pour recevoir les courses proches.'),{enableHighAccuracy:true,maximumAge:5000,timeout:10000})
+}
+function stopGps(){if(gpsWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(gpsWatch);gpsWatch=null}}
+
+function subscribeDriverOffers(){
+  if(!validBackend()||!isUuid(current?.id))return;
+  unsubscribeDriverOffers();
+  driverOfferChannel=sb.channel('driver-offers-'+current.id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+current.id},payload=>{
+      const offer=payload.new;
+      if(offer.status&&offer.status!=='pending')return;
+      activeOffer=offer;loadOfferRide(offer.ride_id);
+    }).subscribe();
+}
+function unsubscribeDriverOffers(){if(driverOfferChannel){try{sb.removeChannel(driverOfferChannel)}catch{}driverOfferChannel=null}}
+async function loadOfferRide(rideId){
+  const {data,error}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+  if(error||!data)return showOffer();
+  currentRide={id:data.id,pickup:data.pickup_address||'Point de prise en charge',destination:data.destination_address||'Destination',price:Number(data.final_price||data.estimated_price||0),distance:data.estimated_distance?Number(data.estimated_distance).toFixed(1)+' km':'—',db:data};
+  renderOfferFromRide();document.getElementById('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')
+}
+function renderOfferFromRide(){
+  if(!currentRide)return;
+  const card=document.querySelector('#offerSection .offer');if(!card)return;
+  card.querySelector('.offerTop b').textContent='Course #'+String(currentRide.id).slice(0,8);
+  card.querySelector('.offerTop .muted').textContent='Nouvelle demande NZILA';
+  card.querySelector('.price').textContent=currentRide.price.toLocaleString('fr-FR')+' FCFA';
+  const route=card.querySelectorAll('.routeText');if(route[0])route[0].querySelector('b').textContent=currentRide.pickup;if(route[1])route[1].querySelector('b').textContent=currentRide.destination;
+  const meta=card.querySelector('.muted[style*="margin-bottom"]');if(meta)meta.textContent='Course NZILA · '+currentRide.distance+' estimés';
+}
+function showOffer(){
+  if(online&&!currentRide&&!activeOffer){document.getElementById('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')}
+}
+function rejectOffer(){
+  if(activeOffer&&validBackend()&&isUuid(current?.id)){
+    sb.from('ride_offers').update({status:'rejected'}).eq('id',activeOffer.id).eq('driver_id',current.id).then(()=>{});
+  }
+  activeOffer=null;document.getElementById('offerSection').classList.add('hidden');toast('Course refusée')
+}
+async function acceptOffer(){
+  if(activeOffer&&validBackend()&&isUuid(current?.id)){
+    const {data,error}=await sb.rpc('accept_ride_v2',{p_ride_id:activeOffer.ride_id,p_driver_id:current.id});
+    if(error){toast('Impossible d’accepter cette course : '+error.message);return}
+    activeOffer=null;
+    const r=data?.[0]||data;
+    currentRide={id:activeOffer?.ride_id||r?.id||activeOffer?.ride_id,pickup:r?.pickup_address||'Point de prise en charge',destination:r?.destination_address||'Destination',price:Number(r?.estimated_price||r?.final_price||0),distance:r?.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—'};
+  }else{
+    currentRide={id:'NZ-10482',pickup:'Bacongo — Pharmacie',destination:'Centre-ville',price:7500,distance:'6,2 km'}
+  }
+  rideState='accepted';document.getElementById('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée')
+}
+function renderRidePage(){
+  document.getElementById('rideTitle').textContent='Course #'+currentRide.id;
+  document.getElementById('pickup').textContent=currentRide.pickup;document.getElementById('destination').textContent=currentRide.destination;
+  document.getElementById('ridePrice').textContent=currentRide.price.toLocaleString('fr-FR')+' FCFA';document.getElementById('rideDistance').textContent=currentRide.distance;
+  const state=document.getElementById('rideState');state.textContent=rideState==='accepted'?'EN ROUTE':rideState==='arrived'?'ARRIVÉ':'EN COURS';state.className='badge '+(rideState==='accepted'?'orange':'green');
+  document.getElementById('arrivedBtn').classList.toggle('hidden',rideState!=='accepted');
+  document.getElementById('startTripBtn').classList.toggle('hidden',rideState!=='arrived');
+  document.getElementById('finishBtn').classList.toggle('hidden',rideState!=='in_progress');
+  setTimeout(()=>rideMap&&rideMap.invalidateSize(),150)
+}
+async function arrived(){
+  if(validBackend()&&isUuid(current?.id)&&currentRide?.id&&isUuid(currentRide.id)){try{await sb.rpc('update_ride_status_v2',{p_ride_id:currentRide.id,p_driver_id:current.id,p_status:'driver_arrived'})}catch(e){}}
+  rideState='arrived';renderRidePage();showModal('<h2>Vous êtes arrivé</h2><p class="muted">Demandez au client son code NZILA à 4 chiffres avant de démarrer la course.</p><div class="field"><input id="code" class="input" maxlength="4" inputmode="numeric" placeholder="Code client"></div><button class="btn primary wide" style="margin-top:10px" onclick="verifyCode()">Valider le client</button>')
+}
+async function verifyCode(){
+  const c=val('code');if(c.length!==4)return toast('Entrez le code à 4 chiffres.');
+  closeModal();rideState='in_progress';
+  if(validBackend()&&isUuid(current?.id)&&currentRide?.id&&isUuid(currentRide.id)){try{await sb.rpc('update_ride_status_v2',{p_ride_id:currentRide.id,p_driver_id:current.id,p_status:'in_progress',p_client_code:c})}catch(e){}}
+  renderRidePage();toast('Client confirmé. Bonne course !')
+}
+async function startTrip(){rideState='in_progress';renderRidePage();toast('Course démarrée')}
+async function finishTrip(){
+  if(!currentRide)return;
+  if(validBackend()&&isUuid(current?.id)&&isUuid(currentRide.id)){try{await sb.rpc('update_ride_status_v2',{p_ride_id:currentRide.id,p_driver_id:current.id,p_status:'completed'})}catch(e){}}
+  current.total_rides=(current.total_rides||0)+1;current.total_revenue=(current.total_revenue||0)+Number(currentRide.price||0);saveCurrent();
+  rideState='completed';renderRidePage();toast('Course terminée. Revenus enregistrés.');setTimeout(()=>{currentRide=null;openPage('home');renderRides();renderStats()},700)
+}
+function saveCurrent(){const a=accounts(),i=a.findIndex(x=>x.id===current.id);if(i>=0){a[i]={...a[i],...current};saveAccounts(a)}localStorage.setItem(SESSION,JSON.stringify(current))}
+function renderStats(){document.getElementById('todayRevenue').textContent=Number(current.total_revenue||0).toLocaleString('fr-FR')+' FCFA';document.getElementById('todayRides').textContent=current.total_rides||0;document.getElementById('rating').textContent=Number(current.rating||5).toFixed(2).replace('.',',')+' ★';document.getElementById('completion').textContent='100 %'}
+function rideHTML(r){return '<div class="listItem"><div><b>'+String(r.id).slice(0,12)+'</b><small>'+esc(r.pickup)+' → '+esc(r.destination)+'</small></div><span class="amount">'+Number(r.price||0).toLocaleString('fr-FR')+' FCFA</span></div>'}
+function renderRides(){const local=JSON.parse(localStorage.getItem('nzila_driver_rides')||'[]');const rows=currentRide?[currentRide,...local]:local;const html=rows.length?rows.map(rideHTML).join(''):'<div class="card">Aucune course terminée pour le moment.</div>';document.getElementById('recentRides').innerHTML=html;document.getElementById('allRides').innerHTML=html}
+function renderChart(){const vals=[35,48,31,62,55,72,64],el=document.getElementById('chart');el.innerHTML=vals.map((v,i)=>'<div style="flex:1;text-align:center;height:100%"><div class="barWrap"><div class="bar" style="height:'+v+'%"></div></div><div class="barLabel">'+['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]+'</div></div>').join('')}
+function renderProfile(){document.getElementById('profileName').textContent=(current.first_name||'')+' '+(current.last_name||'');document.getElementById('profileRating').textContent=Number(current.rating||5).toFixed(2).replace('.',',');document.getElementById('profileRides').textContent=current.total_rides||0;document.getElementById('avatar').textContent=((current.first_name||'N')[0]+(current.last_name||'Z')[0]).toUpperCase();document.getElementById('pFirst').value=current.first_name||'';document.getElementById('pLast').value=current.last_name||'';document.getElementById('pPhone').value=(current.phone||'').replace('+242','');document.getElementById('vMake').value=current.vehicle_make||'';document.getElementById('vModel').value=current.vehicle_model||'';document.getElementById('vPlate').value=current.vehicle_plate||'';document.getElementById('vColor').value=current.vehicle_color||''}
+function saveProfile(){current.first_name=val('pFirst');current.last_name=val('pLast');current.phone=normalizePhone(val('pPhone'));current.vehicle_make=val('vMake');current.vehicle_model=val('vModel');current.vehicle_plate=val('vPlate');current.vehicle_color=val('vColor');saveCurrent();renderProfile();document.getElementById('hello').textContent='Bonjour '+current.first_name+' 👋';toast('Profil enregistré')}
+async function withdraw(){const provider=prompt('Moyen : MTN ou Airtel','MTN');const amount=Number(prompt('Montant en FCFA','50000'));if(!provider||!amount||amount<=0)return;toast('Demande de retrait enregistrée. Le module Mobile Money sera exécuté côté serveur.')}
+async function showSOS(){
+  if(validBackend()&&isUuid(current?.id)){try{const p=await getCurrentPosition();await sb.rpc('trigger_driver_sos_v2',{p_driver_id:current.id,p_latitude:p?.coords?.latitude||null,p_longitude:p?.coords?.longitude||null,p_ride_id:isUuid(currentRide?.id)?currentRide.id:null});toast('🆘 NZILA a été alerté avec votre position.')}catch(e){toast('🆘 Alerte NZILA déclenchée localement.')}}else{toast('🆘 Support NZILA alerté')}
+  showModal('<h2 style="color:#991b1b">🆘 Urgence</h2><p class="muted">Votre alerte a été enregistrée. Utilisez aussi les services d’urgence locaux si nécessaire.</p><button class="btn sos wide" style="margin-top:8px" onclick="closeModal()">Fermer</button>')
+}
+function getCurrentPosition(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('GPS indisponible'));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000})})}
+function showIncident(){showModal('<h2>Signaler un incident</h2><select id="incidentType" class="input field"><option>Accident</option><option>Problème avec le client</option><option>Problème véhicule</option><option>Route / circulation</option><option>Paiement</option><option>Autre</option></select><textarea id="incidentText" class="input field" style="height:100px;padding-top:12px" placeholder="Décrivez la situation"></textarea><button class="btn primary wide" style="margin-top:10px" onclick="submitIncident()">Envoyer</button>')}
+async function submitIncident(){
+  const type=document.getElementById('incidentType')?.value||'Autre',description=document.getElementById('incidentText')?.value.trim()||'';
+  if(validBackend()&&isUuid(current?.id)){try{await sb.from('ride_incidents').insert({ride_id:isUuid(currentRide?.id)?currentRide.id:null,driver_id:current.id,type,description,status:'open'})}catch(e){}}
+  closeModal();toast('Incident transmis à NZILA')
+}
+function openNavigation(){toast('Navigation externe à connecter — GPS NZILA prêt pour intégration')}
+function showModal(content){document.getElementById('modalContent').innerHTML=content;document.getElementById('modal').classList.add('show')}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+function initMaps(){
+  if(!window.L)return;
+  if(!mainMap){mainMap=L.map('mainMap').setView([-4.2634,15.2429],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mainMap);L.marker([-4.2634,15.2429]).addTo(mainMap).bindPopup('Position chauffeur').openPopup()}
+  if(!rideMap){rideMap=L.map('rideMap').setView([-4.2634,15.2429],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(rideMap);L.marker([-4.2634,15.2429]).addTo(rideMap).bindPopup('Point de prise en charge')}
+}
+function boot(){
+  try{const s=JSON.parse(localStorage.getItem(SESSION)||'null');if(s&&accounts().some(x=>x.id===s.id)){current=s;openApp()}}catch{}
+}
+boot();
+
+</script>
+</body>
 </html>

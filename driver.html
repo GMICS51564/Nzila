@@ -56,13 +56,19 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
     </div>
 
     <div id="loginForm">
-      <input id="email" class="input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Téléphone (+242...)">
+      <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
+  <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
+  <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+</div>
       <input id="password" class="input" type="password" placeholder="Mot de passe" style="margin-top:8px">
       <button class="primary" style="margin-top:12px" onclick="login()">Entrer dans le cockpit</button>
     </div>
 
     <div id="applyForm" class="hidden">
-      <input id="aEmail" class="input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Téléphone (+242...)">
+      <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
+  <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
+  <input id="aEmail" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+</div>
       <input id="aPassword" class="input" type="password" placeholder="Mot de passe" style="margin-top:8px">
       <div class="grid">
         <input id="aFirst" class="input" placeholder="Prénom" style="margin-top:8px">
@@ -235,12 +241,11 @@ function authMode(mode){
 function authMsg(t){document.getElementById('authMsg').textContent=t}
 
 function normalizeNzilaPhone(raw){
-  let p=(raw||'').replace(/[\s().-]/g,'');
-  if(p.startsWith('00')) p='+'+p.slice(2);
-  if(p.startsWith('242')) p='+'+p;
-  if(p.startsWith('0')) p='+242'+p.slice(1);
-  if(!/^\+242[0-9]{8,9}$/.test(p)) return null;
-  return p;
+  let digits=(raw||'').replace(/\D/g,'');
+  if(digits.startsWith('242')) digits=digits.slice(3);
+  if(digits.startsWith('0')) digits=digits.slice(1);
+  if(!/^[0-9]{8,9}$/.test(digits)) return null;
+  return '+242'+digits;
 }
 function nzilaDriverAccounts(){try{return JSON.parse(localStorage.getItem('nzila_driver_accounts')||'[]')}catch(e){return []}}
 function saveNzilaDriverAccounts(a){localStorage.setItem('nzila_driver_accounts',JSON.stringify(a))}
@@ -256,7 +261,7 @@ async function applyDriver(){
   if(!phone||!password)return authMsg('Numéro de téléphone et mot de passe requis.');
   if(password.length<6)return authMsg('Le mot de passe doit contenir au moins 6 caractères.');
   const accounts=nzilaDriverAccounts();
-  if(accounts.some(a=>a.phone===phone))return authMsg('Un compte chauffeur existe déjà avec ce numéro.');
+  if(accounts.some(a=>a.phone===phone))return authMsg('Ce numéro est déjà utilisé pour un compte chauffeur.');
   const u={id:'local-driver-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),phone,first_name:v('aFirst'),last_name:v('aLast'),license_number:v('aLicense'),vehicle_make:v('aMake'),vehicle_model:v('aModel'),vehicle_plate:v('aPlate'),vehicle_color:v('aColor'),role:'driver',verification_status:'pending',created_at:new Date().toISOString()};
   accounts.push({...u,password});saveNzilaDriverAccounts(accounts);localStorage.setItem('nzila_driver_session',JSON.stringify(u));
   authMsg('Inscription enregistrée. Votre candidature est en attente de validation NZILA.');

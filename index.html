@@ -22,7 +22,7 @@
     </div>
     <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
   <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
-  <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
+  <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro de téléphone" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
 </div><input id="password" class="input" type="password" placeholder="Mot de passe">
     <button id="authBtn" class="primary" style="margin-top:14px" onclick="submitAuth()">Se connecter</button>
     <div id="authStatus" class="status"></div>
@@ -91,6 +91,12 @@ function validConfig(){
   );
 }
 function authMode(m){document.getElementById('loginTab').classList.toggle('active',m==='login');document.getElementById('signupTab').classList.toggle('active',m==='signup');document.getElementById('signupFields').classList.toggle('hidden',m!=='signup');document.getElementById('authBtn').textContent=m==='login'?'Se connecter':'Créer mon compte';document.getElementById('authBtn').dataset.mode=m}
+// NZILA : "Votre numéro" EST le numéro de téléphone et l'identifiant du compte.
+
+function nzilaCanonicalPhone(value){
+  return normalizeNzilaPhone(value || '');
+}
+
 function normalizeNzilaPhone(raw){
   let digits=(raw||'').replace(/\D/g,'');
   if(digits.startsWith('242')) digits=digits.slice(3);
@@ -111,7 +117,7 @@ async function submitAuth(){
     const first_name=document.getElementById('firstName').value.trim();
     const last_name=document.getElementById('lastName').value.trim();
     if(!first_name||!last_name){setAuthStatus('Prénom et nom requis.');return}
-    if(accounts.some(a=>a.phone===phone)){
+    if(accounts.some(a=>nzilaCanonicalPhone(a.phone)===phone)){
       setAuthStatus('Ce numéro est déjà utilisé. Connectez-vous avec ce numéro.');
       return;
     }
@@ -131,7 +137,7 @@ async function submitAuth(){
     openPage('home');
     return;
   }
-  const a=accounts.find(a=>a.phone===phone&&a.password===password);
+  const a=accounts.find(a=>nzilaCanonicalPhone(a.phone)===phone&&a.password===password);
   if(!a){setAuthStatus('Numéro ou mot de passe incorrect.');return}
   const u={...a};delete u.password;localStorage.setItem('nzila_client_session',JSON.stringify(u));await boot(u);
 }

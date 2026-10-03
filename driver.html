@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>NZILA DRIVER — V1</title>
+<title>NZILA DRIVER — V1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -274,212 +274,85 @@
 const SUPABASE_URL='https://dsvbtlwxujuusnarcbfg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_WYONr6ioYrczatDZGZk4LA_cJMxOJ8G';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-
-const ACC='nzila_driver_accounts', SESSION='nzila_driver_session';
-let current=null,online=false,currentRide=null,rideState='accepted',mainMap=null,rideMap=null,gpsWatch=null,driverOfferChannel=null,activeOffer=null;
-
-function accounts(){try{return JSON.parse(localStorage.getItem(ACC)||'[]')}catch{return[]}}
-function saveAccounts(a){localStorage.setItem(ACC,JSON.stringify(a))}
-function normalizePhone(raw){
-  let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('242'))d=d.slice(3);if(d.startsWith('0'))d=d.slice(1);
-  return /^[0-9]{8,9}$/.test(d)?'+242'+d:''
-}
-function authMode(mode){
-  document.getElementById('loginTab').classList.toggle('active',mode==='login');
-  document.getElementById('signupTab').classList.toggle('active',mode==='signup');
-  document.getElementById('loginForm').classList.toggle('hidden',mode!=='login');
-  document.getElementById('signupForm').classList.toggle('hidden',mode!=='signup');
-  document.getElementById('authTitle').textContent=mode==='login'?'Bienvenue chauffeur':'Devenir chauffeur NZILA';
-  msg('')
-}
-function msg(t){document.getElementById('authMsg').textContent=t||''}
-function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v||'')}
-
-function applyDriver(){
-  const phone=normalizePhone(document.getElementById('signupPhone').value),password=document.getElementById('signupPassword').value.trim();
-  const first=document.getElementById('firstName').value.trim(),last=document.getElementById('lastName').value.trim(),license=document.getElementById('license').value.trim();
-  if(!phone)return msg('Le champ « Votre numéro » est votre numéro de téléphone. Saisissez un numéro valide.');
-  if(!password)return msg('Le mot de passe est obligatoire.');
-  if(password.length<6)return msg('Le mot de passe doit contenir au moins 6 caractères.');
-  if(!first||!last)return msg('Prénom et nom sont obligatoires.');
-  if(!license)return msg('Le numéro de permis est obligatoire.');
-  const a=accounts();if(a.some(x=>normalizePhone(x.phone)===phone))return msg('Ce numéro possède déjà un compte NZILA.');
-  const u={id:crypto.randomUUID?crypto.randomUUID():'local-driver-'+Date.now(),phone,password,first_name:first,last_name:last,license_number:license,vehicle_make:val('make'),vehicle_model:val('model'),vehicle_plate:val('plate'),vehicle_color:val('vehicleColor'),verification_status:'approved',availability_status:'offline',rating:5,total_rides:0,total_revenue:0,created_at:new Date().toISOString()};
-  a.push(u);saveAccounts(a);localStorage.setItem(SESSION,JSON.stringify(u));current=u;openApp();
-}
-function login(){
-  const phone=normalizePhone(document.getElementById('loginPhone').value),password=document.getElementById('loginPassword').value;
-  if(!phone||!password)return msg('Votre numéro et votre mot de passe sont obligatoires.');
-  const u=accounts().find(x=>normalizePhone(x.phone)===phone&&x.password===password);
-  if(!u)return msg('Numéro ou mot de passe incorrect.');
-  localStorage.setItem(SESSION,JSON.stringify(u));current=u;openApp();
-}
-function openApp(){
-  document.getElementById('auth').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
-  document.getElementById('hello').textContent='Bonjour '+(current.first_name||'chauffeur')+' 👋';
-  renderProfile();renderRides();renderStats();renderChart();initMaps()
-}
-function logout(){
-  stopGps();if(driverOfferChannel)try{sb.removeChannel(driverOfferChannel)}catch{}
-  online=false;localStorage.removeItem(SESSION);document.getElementById('app').classList.add('hidden');document.getElementById('auth').classList.remove('hidden');authMode('login')
-}
-function val(id){return document.getElementById(id).value.trim()}
-function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(()=>e.classList.remove('show'),2500)}
-
-async function syncOnlineState(){
-  if(!validBackend()||!isUuid(current?.id))return;
-  try{
-    const {error}=await sb.rpc('set_driver_online_v2',{p_driver_id:current.id,p_online:online});
-    if(error)console.warn('NZILA online sync:',error.message)
-  }catch(e){console.warn(e)}
-}
+const ACC='nzila_driver_accounts',SESSION='nzila_driver_session';
+let current=null,online=false,currentRide=null,rideState='accepted',mainMap=null,rideMap=null,gpsWatch=null,driverOfferChannel=null,notificationChannel=null,activeOffer=null;
+const $=id=>document.getElementById(id),val=id=>($(id)?.value||'').trim(),money=v=>Number(v||0).toLocaleString('fr-FR')+' FCFA',esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 function validBackend(){return SUPABASE_URL.startsWith('https://')&&!SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')}
-
-function openPage(p){
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  const e=document.getElementById(p+'Page');if(e)e.classList.add('active');
-  document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===p));
-  window.scrollTo({top:0,behavior:'smooth'});
-  if(p==='map')setTimeout(()=>mainMap&&mainMap.invalidateSize(),100)
+function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v||'')}
+function normalizePhone(raw){let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('242'))d=d.slice(3);if(d.startsWith('0'))d=d.slice(1);return /^[0-9]{8,9}$/.test(d)?'+242'+d:''}
+function authMode(mode){$('loginTab').classList.toggle('active',mode==='login');$('signupTab').classList.toggle('active',mode==='signup');$('loginForm').classList.toggle('hidden',mode!=='login');$('signupForm').classList.toggle('hidden',mode!=='signup');$('authTitle').textContent=mode==='login'?'Bienvenue chauffeur':'Devenir chauffeur NZILA';msg('')}
+function msg(t){$('authMsg').textContent=t||''}
+async function applyDriver(){
+  const phone=normalizePhone($('signupPhone').value),password=$('signupPassword').value.trim(),first=$('firstName').value.trim(),last=$('lastName').value.trim(),license=$('license').value.trim();
+  if(!phone)return msg('Le numéro de téléphone est invalide.');
+  if(!password||password.length<4)return msg('Le mot de passe doit contenir au moins 4 caractères.');
+  if(!first||!last||!license)return msg('Prénom, nom et numéro de permis sont obligatoires.');
+  try{
+    const {data,error}=await sb.rpc('nzila_register',{p_first_name:first,p_last_name:last,p_phone:phone,p_password:password,p_role:'driver',p_license_number:license,p_vehicle_make:val('make'),p_vehicle_model:val('model'),p_vehicle_plate:val('plate'),p_vehicle_color:val('vehicleColor')});
+    if(error)throw error;
+    current={...data,license_number:license,vehicle_make:val('make'),vehicle_model:val('model'),vehicle_plate:val('plate'),vehicle_color:val('vehicleColor'),role:'driver',online:false,availability_status:'offline',rating:5,total_rides:0,total_revenue:0};
+    localStorage.setItem(SESSION,JSON.stringify(current));openApp();msg('');toast('Compte chauffeur créé dans NZILA.');
+  }catch(e){msg(String(e.message||e))}
 }
-
+async function login(){
+  const phone=normalizePhone($('loginPhone').value),password=$('loginPassword').value;
+  if(!phone||!password)return msg('Votre numéro et votre mot de passe sont obligatoires.');
+  try{
+    const {data,error}=await sb.rpc('nzila_login',{p_phone:phone,p_password:password});
+    if(error)throw error;if(!data?.id||data.role!=='driver')throw new Error('COMPTE_CHAUFFEUR_REQUIS');
+    const {data:dp,error:de}=await sb.from('driver_profiles').select('*').eq('id',data.id).maybeSingle();if(de)throw de;
+    current={...data,...dp,role:'driver'};localStorage.setItem(SESSION,JSON.stringify(current));openApp();
+  }catch(e){msg(String(e.message||e))}
+}
+async function openApp(){
+  $('auth').classList.add('hidden');$('app').classList.remove('hidden');$('hello').textContent='Bonjour '+(current.first_name||'chauffeur')+' 👋';online=!!current.online;renderOnline();renderProfile();renderRides();await loadStatsFromBackend();await loadWallet();loadChart();initMaps();loadNotifications();subscribeNotifications();if(online){startGps();subscribeDriverOffers()}
+}
+function logout(){stopGps();unsubscribeDriverOffers();if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};online=false;localStorage.removeItem(SESSION);$('app').classList.add('hidden');$('auth').classList.remove('hidden');authMode('login')}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(()=>e.classList.remove('show'),2800)}
+function openPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));const e=$(p+'Page');if(e)e.classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===p));window.scrollTo({top:0,behavior:'smooth'});if(p==='map')setTimeout(()=>mainMap&&mainMap.invalidateSize(),100);if(p==='notifications')loadNotifications();if(p==='wallet')loadWallet();if(p==='rides')renderRides();if(p==='profile')renderProfile()}
+function renderOnline(){$('onlineToggle').classList.toggle('on',online);document.querySelector('.hero').classList.toggle('online',online);$('statusText').textContent=online?'NZILA ACTIVE':'HORS LIGNE'}
 async function toggleOnline(){
-  if(current?.verification_status&&current.verification_status!=='approved'){toast('Votre compte chauffeur doit être approuvé.');return}
   online=!online;
-  const t=document.getElementById('onlineToggle');t.classList.toggle('on',online);document.querySelector('.hero').classList.toggle('online',online);
-  document.getElementById('statusText').textContent=online?'NZILA ACTIVE':'HORS LIGNE';
-  current.availability_status=online?'online':'offline';saveCurrent();
-  await syncOnlineState();
-  if(online){
-    startGps();subscribeDriverOffers();toast('Vous êtes maintenant en ligne.');
-    setTimeout(()=>showOffer(),2200);
-  }else{
-    stopGps();unsubscribeDriverOffers();document.getElementById('offerSection').classList.add('hidden');toast('Vous êtes hors ligne.')
-  }
+  const {error}=await sb.rpc('nzila_set_driver_online',{p_driver_id:current.id,p_online:online});
+  if(error){online=!online;renderOnline();return toast('Impossible de modifier votre disponibilité : '+error.message)}
+  current.online=online;current.availability_status=online?'online':'offline';saveCurrent();renderOnline();
+  if(online){startGps();subscribeDriverOffers();toast('Vous êtes maintenant en ligne.')}else{stopGps();unsubscribeDriverOffers();$('offerSection').classList.add('hidden');toast('Vous êtes hors ligne.')}
 }
-
-function startGps(){
-  if(!navigator.geolocation||gpsWatch)return;
-  gpsWatch=navigator.geolocation.watchPosition(async pos=>{
-    const c=pos.coords;
-    if(mainMap){mainMap.setView([c.latitude,c.longitude],Math.max(mainMap.getZoom(),14));}
-    if(!validBackend()||!isUuid(current?.id))return;
-    try{
-      await sb.rpc('upsert_driver_location_v2',{
-        p_driver_id:current.id,p_latitude:c.latitude,p_longitude:c.longitude,
-        p_accuracy:c.accuracy||null,p_speed:c.speed||null,p_heading:c.heading||null
-      });
-    }catch(e){console.warn('GPS NZILA:',e)}
-  },()=>toast('Autorisez la localisation pour recevoir les courses proches.'),{enableHighAccuracy:true,maximumAge:5000,timeout:10000})
-}
+function startGps(){if(!navigator.geolocation||gpsWatch)return;gpsWatch=navigator.geolocation.watchPosition(async pos=>{const c=pos.coords;if(mainMap)mainMap.setView([c.latitude,c.longitude],Math.max(mainMap.getZoom(),14));if(!isUuid(current?.id))return;const {error}=await sb.rpc('nzila_update_driver_location',{p_driver_id:current.id,p_latitude:c.latitude,p_longitude:c.longitude,p_accuracy:c.accuracy||null,p_speed:c.speed||null,p_heading:c.heading||null});if(error)console.warn('GPS NZILA:',error.message)},()=>toast('Autorisez la localisation pour recevoir les courses proches.'),{enableHighAccuracy:true,maximumAge:5000,timeout:10000})}
 function stopGps(){if(gpsWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(gpsWatch);gpsWatch=null}}
-
-function subscribeDriverOffers(){
-  if(!validBackend()||!isUuid(current?.id))return;
-  unsubscribeDriverOffers();
-  driverOfferChannel=sb.channel('driver-offers-'+current.id)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+current.id},payload=>{
-      const offer=payload.new;
-      if(offer.status&&offer.status!=='pending')return;
-      activeOffer=offer;loadOfferRide(offer.ride_id);
-    }).subscribe();
-}
+function subscribeDriverOffers(){if(!validBackend()||!isUuid(current?.id))return;unsubscribeDriverOffers();driverOfferChannel=sb.channel('driver-rides-'+current.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'driver_id=eq.'+current.id},p=>{if(['accepted','driver_arriving','arrived','in_progress'].includes(p.new.status)){loadRide(p.new);toast('🚕 Course NZILA assignée.') }if(p.new.status==='completed'||p.new.status==='cancelled'){currentRide=null;$('offerSection').classList.add('hidden');loadStatsFromBackend();renderRides()}}).subscribe()}
 function unsubscribeDriverOffers(){if(driverOfferChannel){try{sb.removeChannel(driverOfferChannel)}catch{}driverOfferChannel=null}}
-async function loadOfferRide(rideId){
-  const {data,error}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
-  if(error||!data)return showOffer();
-  currentRide={id:data.id,pickup:data.pickup_address||'Point de prise en charge',destination:data.destination_address||'Destination',price:Number(data.final_price||data.estimated_price||0),distance:data.estimated_distance?Number(data.estimated_distance).toFixed(1)+' km':'—',db:data};
-  renderOfferFromRide();document.getElementById('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')
-}
-function renderOfferFromRide(){
-  if(!currentRide)return;
-  const card=document.querySelector('#offerSection .offer');if(!card)return;
-  card.querySelector('.offerTop b').textContent='Course #'+String(currentRide.id).slice(0,8);
-  card.querySelector('.offerTop .muted').textContent='Nouvelle demande NZILA';
-  card.querySelector('.price').textContent=currentRide.price.toLocaleString('fr-FR')+' FCFA';
-  const route=card.querySelectorAll('.routeText');if(route[0])route[0].querySelector('b').textContent=currentRide.pickup;if(route[1])route[1].querySelector('b').textContent=currentRide.destination;
-  const meta=card.querySelector('.muted[style*="margin-bottom"]');if(meta)meta.textContent='Course NZILA · '+currentRide.distance+' estimés';
-}
-function showOffer(){
-  if(online&&!currentRide&&!activeOffer){document.getElementById('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')}
-}
-function rejectOffer(){
-  if(activeOffer&&validBackend()&&isUuid(current?.id)){
-    sb.from('ride_offers').update({status:'rejected'}).eq('id',activeOffer.id).eq('driver_id',current.id).then(()=>{});
-  }
-  activeOffer=null;document.getElementById('offerSection').classList.add('hidden');toast('Course refusée')
-}
-async function acceptOffer(){
-  if(activeOffer&&validBackend()&&isUuid(current?.id)){
-    const {data,error}=await sb.rpc('accept_ride_v2',{p_ride_id:activeOffer.ride_id,p_driver_id:current.id});
-    if(error){toast('Impossible d’accepter cette course : '+error.message);return}
-    activeOffer=null;
-    const r=data?.[0]||data;
-    currentRide={id:activeOffer?.ride_id||r?.id||activeOffer?.ride_id,pickup:r?.pickup_address||'Point de prise en charge',destination:r?.destination_address||'Destination',price:Number(r?.estimated_price||r?.final_price||0),distance:r?.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—'};
-  }else{
-    currentRide={id:'NZ-10482',pickup:'Bacongo — Pharmacie',destination:'Centre-ville',price:7500,distance:'6,2 km'}
-  }
-  rideState='accepted';document.getElementById('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée')
-}
-function renderRidePage(){
-  document.getElementById('rideTitle').textContent='Course #'+currentRide.id;
-  document.getElementById('pickup').textContent=currentRide.pickup;document.getElementById('destination').textContent=currentRide.destination;
-  document.getElementById('ridePrice').textContent=currentRide.price.toLocaleString('fr-FR')+' FCFA';document.getElementById('rideDistance').textContent=currentRide.distance;
-  const state=document.getElementById('rideState');state.textContent=rideState==='accepted'?'EN ROUTE':rideState==='arrived'?'ARRIVÉ':'EN COURS';state.className='badge '+(rideState==='accepted'?'orange':'green');
-  document.getElementById('arrivedBtn').classList.toggle('hidden',rideState!=='accepted');
-  document.getElementById('startTripBtn').classList.toggle('hidden',rideState!=='arrived');
-  document.getElementById('finishBtn').classList.toggle('hidden',rideState!=='in_progress');
-  setTimeout(()=>rideMap&&rideMap.invalidateSize(),150)
-}
-async function arrived(){
-  if(validBackend()&&isUuid(current?.id)&&currentRide?.id&&isUuid(currentRide.id)){try{await sb.rpc('update_ride_status_v2',{p_ride_id:currentRide.id,p_driver_id:current.id,p_status:'driver_arrived'})}catch(e){}}
-  rideState='arrived';renderRidePage();showModal('<h2>Vous êtes arrivé</h2><p class="muted">Demandez au client son code NZILA à 4 chiffres avant de démarrer la course.</p><div class="field"><input id="code" class="input" maxlength="4" inputmode="numeric" placeholder="Code client"></div><button class="btn primary wide" style="margin-top:10px" onclick="verifyCode()">Valider le client</button>')
-}
-async function verifyCode(){
-  const c=val('code');if(c.length!==4)return toast('Entrez le code à 4 chiffres.');
-  closeModal();rideState='in_progress';
-  if(validBackend()&&isUuid(current?.id)&&currentRide?.id&&isUuid(currentRide.id)){try{await sb.rpc('update_ride_status_v2',{p_ride_id:currentRide.id,p_driver_id:current.id,p_status:'in_progress',p_client_code:c})}catch(e){}}
-  renderRidePage();toast('Client confirmé. Bonne course !')
-}
-async function startTrip(){rideState='in_progress';renderRidePage();toast('Course démarrée')}
-async function finishTrip(){
-  if(!currentRide)return;
-  if(validBackend()&&isUuid(current?.id)&&isUuid(currentRide.id)){try{await sb.rpc('update_ride_status_v2',{p_ride_id:currentRide.id,p_driver_id:current.id,p_status:'completed'})}catch(e){}}
-  current.total_rides=(current.total_rides||0)+1;current.total_revenue=(current.total_revenue||0)+Number(currentRide.price||0);saveCurrent();
-  rideState='completed';renderRidePage();toast('Course terminée. Revenus enregistrés.');setTimeout(()=>{currentRide=null;openPage('home');renderRides();renderStats()},700)
-}
-function saveCurrent(){const a=accounts(),i=a.findIndex(x=>x.id===current.id);if(i>=0){a[i]={...a[i],...current};saveAccounts(a)}localStorage.setItem(SESSION,JSON.stringify(current))}
-function renderStats(){document.getElementById('todayRevenue').textContent=Number(current.total_revenue||0).toLocaleString('fr-FR')+' FCFA';document.getElementById('todayRides').textContent=current.total_rides||0;document.getElementById('rating').textContent=Number(current.rating||5).toFixed(2).replace('.',',')+' ★';document.getElementById('completion').textContent='100 %'}
-function rideHTML(r){return '<div class="listItem"><div><b>'+String(r.id).slice(0,12)+'</b><small>'+esc(r.pickup)+' → '+esc(r.destination)+'</small></div><span class="amount">'+Number(r.price||0).toLocaleString('fr-FR')+' FCFA</span></div>'}
-function renderRides(){const local=JSON.parse(localStorage.getItem('nzila_driver_rides')||'[]');const rows=currentRide?[currentRide,...local]:local;const html=rows.length?rows.map(rideHTML).join(''):'<div class="card">Aucune course terminée pour le moment.</div>';document.getElementById('recentRides').innerHTML=html;document.getElementById('allRides').innerHTML=html}
-function renderChart(){const vals=[35,48,31,62,55,72,64],el=document.getElementById('chart');el.innerHTML=vals.map((v,i)=>'<div style="flex:1;text-align:center;height:100%"><div class="barWrap"><div class="bar" style="height:'+v+'%"></div></div><div class="barLabel">'+['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]+'</div></div>').join('')}
-function renderProfile(){document.getElementById('profileName').textContent=(current.first_name||'')+' '+(current.last_name||'');document.getElementById('profileRating').textContent=Number(current.rating||5).toFixed(2).replace('.',',');document.getElementById('profileRides').textContent=current.total_rides||0;document.getElementById('avatar').textContent=((current.first_name||'N')[0]+(current.last_name||'Z')[0]).toUpperCase();document.getElementById('pFirst').value=current.first_name||'';document.getElementById('pLast').value=current.last_name||'';document.getElementById('pPhone').value=(current.phone||'').replace('+242','');document.getElementById('vMake').value=current.vehicle_make||'';document.getElementById('vModel').value=current.vehicle_model||'';document.getElementById('vPlate').value=current.vehicle_plate||'';document.getElementById('vColor').value=current.vehicle_color||''}
-function saveProfile(){current.first_name=val('pFirst');current.last_name=val('pLast');current.phone=normalizePhone(val('pPhone'));current.vehicle_make=val('vMake');current.vehicle_model=val('vModel');current.vehicle_plate=val('vPlate');current.vehicle_color=val('vColor');saveCurrent();renderProfile();document.getElementById('hello').textContent='Bonjour '+current.first_name+' 👋';toast('Profil enregistré')}
-async function withdraw(){const provider=prompt('Moyen : MTN ou Airtel','MTN');const amount=Number(prompt('Montant en FCFA','50000'));if(!provider||!amount||amount<=0)return;toast('Demande de retrait enregistrée. Le module Mobile Money sera exécuté côté serveur.')}
-async function showSOS(){
-  if(validBackend()&&isUuid(current?.id)){try{const p=await getCurrentPosition();await sb.rpc('trigger_driver_sos_v2',{p_driver_id:current.id,p_latitude:p?.coords?.latitude||null,p_longitude:p?.coords?.longitude||null,p_ride_id:isUuid(currentRide?.id)?currentRide.id:null});toast('🆘 NZILA a été alerté avec votre position.')}catch(e){toast('🆘 Alerte NZILA déclenchée localement.')}}else{toast('🆘 Support NZILA alerté')}
-  showModal('<h2 style="color:#991b1b">🆘 Urgence</h2><p class="muted">Votre alerte a été enregistrée. Utilisez aussi les services d’urgence locaux si nécessaire.</p><button class="btn sos wide" style="margin-top:8px" onclick="closeModal()">Fermer</button>')
-}
-function getCurrentPosition(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('GPS indisponible'));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000})})}
+async function loadRide(r){currentRide={id:r.id,pickup:r.pickup_address||'Point de prise en charge',destination:r.destination_address||'Destination',price:Number(r.final_price??r.estimated_price??0),distance:r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—',db:r};renderOfferFromRide();$('offerSection').classList.remove('hidden')}
+function renderOfferFromRide(){if(!currentRide)return;const card=document.querySelector('#offerSection .offer');if(!card)return;card.querySelector('.offerTop b').textContent='Course #'+String(currentRide.id).slice(0,8);card.querySelector('.offerTop .muted').textContent='Course assignée par NZILA';card.querySelector('.price').textContent=money(currentRide.price);const route=card.querySelectorAll('.routeText');if(route[0])route[0].querySelector('b').textContent=currentRide.pickup;if(route[1])route[1].querySelector('b').textContent=currentRide.destination;const meta=card.querySelector('.muted[style*="margin-bottom"]');if(meta)meta.textContent='Course NZILA · '+currentRide.distance+' estimés'}
+function showOffer(){if(online&&!currentRide){$('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')}}
+async function rejectOffer(){if(!currentRide)return;$('offerSection').classList.add('hidden');if(isUuid(current.id)&&isUuid(currentRide.id)){const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:currentRide.id,p_driver_id:current.id});if(error)return toast('Impossible de refuser : '+error.message)}currentRide=null;toast('Course refusée.')}
+async function acceptOffer(){if(!currentRide)return toast('Aucune course disponible.');rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée.')}
+function renderRidePage(){$('rideTitle').textContent='Course #'+String(currentRide?.id||'').slice(0,8);$('pickup').textContent=currentRide?.pickup||'—';$('destination').textContent=currentRide?.destination||'—';$('ridePrice').textContent=money(currentRide?.price);$('rideDistance').textContent=currentRide?.distance||'—';const state=$('rideState');state.textContent=rideState==='accepted'?'EN ROUTE':rideState==='arrived'?'ARRIVÉ':rideState==='in_progress'?'EN COURS':'TERMINÉ';state.className='badge '+(rideState==='accepted'?'orange':'green');$('arrivedBtn').classList.toggle('hidden',rideState!=='accepted');$('startTripBtn').classList.toggle('hidden',rideState!=='arrived');$('finishBtn').classList.toggle('hidden',rideState!=='in_progress');setTimeout(()=>rideMap&&rideMap.invalidateSize(),150)}
+async function arrived(){if(!currentRide)return;const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'arrived'});if(error)return toast(error.message);rideState='arrived';renderRidePage();showModal('<h2>Vous êtes arrivé</h2><p class="muted">Demandez au client son code NZILA à 4 chiffres avant de démarrer la course.</p><div class="field"><input id="code" class="input" maxlength="4" inputmode="numeric" placeholder="Code client"></div><button class="btn primary wide" style="margin-top:10px" onclick="verifyCode()">Valider le client</button>')}
+async function verifyCode(){const c=val('code');if(c.length!==4)return toast('Entrez le code à 4 chiffres.');closeModal();const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'in_progress'});if(error)return toast(error.message);rideState='in_progress';renderRidePage();toast('Client confirmé. Bonne course !')}
+async function startTrip(){if(!currentRide)return;const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'in_progress'});if(error)return toast(error.message);rideState='in_progress';renderRidePage();toast('Course démarrée')}
+async function finishTrip(){if(!currentRide)return;const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'completed'});if(error)return toast(error.message);const payment=await sb.rpc('nzila_create_payment',{p_ride_id:currentRide.id,p_method:'cash'});if(!payment.error){const paid=await sb.rpc('nzila_confirm_cash_payment',{p_ride_id:currentRide.id});if(!paid.error){const paymentId=paid.data?.payment_id;if(paymentId)await sb.rpc('nzila_credit_driver',{p_payment_id:paymentId})}}rideState='completed';toast('Course terminée. Paiement et gains synchronisés.');currentRide=null;$('offerSection').classList.add('hidden');await loadStatsFromBackend();await loadWallet();renderRides();openPage('home')}
+async function loadStatsFromBackend(){if(!isUuid(current?.id))return;const {data,error}=await sb.from('driver_profiles').select('*').eq('id',current.id).maybeSingle();if(!error&&data){current={...current,...data};saveCurrent();$('todayRides').textContent=data.total_rides||0;$('rating').textContent=Number(data.rating||5).toFixed(2).replace('.',',')+' ★';$('completion').textContent='100 %';$('todayRevenue').textContent=money(data.total_revenue||0)}}
+async function loadWallet(){const e=$('walletPage .list');if(!isUuid(current?.id))return;const {data}=await sb.from('nzila_driver_wallet_summary').select('*').eq('driver_id',current.id).maybeSingle();const balance=Number(data?.balance||0);const box=document.querySelector('#walletPage .card div[style*="font-size:34px"]');if(box)box.textContent=money(balance);const {data:tx}=await sb.from('wallet_transactions').select('*').eq('driver_id',current.id).order('created_at',{ascending:false}).limit(20);if(e)e.innerHTML=tx?.length?tx.map(x=>'<div class="listItem"><div><b>'+esc(x.description||x.type)+'</b><small>'+new Date(x.created_at).toLocaleString('fr-FR')+'</small></div><span class="amount">'+(x.amount>0?'+':'')+money(x.amount)+'</span></div>').join(''):'<div class="card">Aucune transaction synchronisée.</div>'}
+async function withdraw(){toast('Le portefeuille est connecté. Le retrait Mobile Money nécessite encore un RPC de retrait fournisseur, qui n’existe pas dans Core 1.0.')}
+function saveCurrent(){localStorage.setItem(SESSION,JSON.stringify(current))}
+function renderProfile(){$('profileName').textContent=((current?.first_name||'')+' '+(current?.last_name||'')).trim()||'Chauffeur NZILA';$('profileRating').textContent=Number(current?.rating||5).toFixed(2).replace('.',',');$('profileRides').textContent=current?.total_rides||0;$('avatar').textContent=((current?.first_name||'N')[0]+(current?.last_name||'Z')[0]).toUpperCase();$('pFirst').value=current?.first_name||'';$('pLast').value=current?.last_name||'';$('pPhone').value=(current?.phone||'').replace('+242','');$('vMake').value=current?.vehicle_make||'';$('vModel').value=current?.vehicle_model||'';$('vPlate').value=current?.vehicle_plate||'';$('vColor').value=current?.vehicle_color||''}
+async function saveProfile(){const first=val('pFirst'),last=val('pLast'),phone=normalizePhone(val('pPhone'));if(!first||!last||!phone)return toast('Prénom, nom et téléphone sont requis.');const {data,error}=await sb.rpc('nzila_update_driver_profile_app',{p_user_id:current.id,p_first_name:first,p_last_name:last,p_phone:phone,p_vehicle_make:val('vMake'),p_vehicle_model:val('vModel'),p_vehicle_plate:val('vPlate'),p_vehicle_color:val('vColor')});if(error)return toast('Profil non enregistré : '+error.message);current={...current,...data,vehicle_make:val('vMake'),vehicle_model:val('vModel'),vehicle_plate:val('vPlate'),vehicle_color:val('vColor')};saveCurrent();renderProfile();toast('Profil enregistré dans NZILA')}
+async function loadNotifications(){const e=document.querySelector('#notificationsPage .list');const {data,error}=await sb.from('notifications').select('*').eq('user_id',current.id).order('created_at',{ascending:false}).limit(50);if(error){e.innerHTML='<div class="card">Notifications indisponibles : '+esc(error.message)+'</div>';return}e.innerHTML=data?.length?data.map(x=>'<button class="listItem" style="width:100%;text-align:left" onclick="readNotification(\''+x.id+'\')"><div><b>'+esc(x.title)+'</b><small>'+esc(x.message)+'</small></div><span>'+(x.is_read?'':'🔔')+'</span></button>').join(''):'<div class="card">Aucune notification.</div>'}
+async function readNotification(id){const {error}=await sb.rpc('nzila_mark_notification_read',{p_notification_id:id});if(error)toast(error.message);else loadNotifications()}
+function subscribeNotifications(){if(!isUuid(current?.id))return;if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};notificationChannel=sb.channel('driver-notifications-'+current.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+current.id},p=>{toast('🔔 '+(p.new.title||'Nouvelle notification'));loadNotifications()}).subscribe()}
+async function showSOS(){try{const p=await getCurrentPosition();const {data,error}=await sb.rpc('nzila_trigger_sos',{p_user_id:current.id,p_ride_id:isUuid(currentRide?.id)?currentRide.id:null,p_type:'emergency',p_latitude:p.coords.latitude,p_longitude:p.coords.longitude,p_accuracy:p.coords.accuracy||null,p_message:'SOS chauffeur NZILA'});if(error)throw error;toast('🆘 Alerte SOS transmise à NZILA.')}catch(e){toast('SOS : '+(e.message||'échec de transmission'))}showModal('<h2 style="color:#991b1b">🆘 Urgence</h2><p class="muted">Votre alerte a été enregistrée. Utilisez aussi les services d’urgence locaux si nécessaire.</p><button class="btn sos wide" style="margin-top:8px" onclick="closeModal()">Fermer</button>')}
+function getCurrentPosition(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('GPS indisponible'));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000});});}
 function showIncident(){showModal('<h2>Signaler un incident</h2><select id="incidentType" class="input field"><option>Accident</option><option>Problème avec le client</option><option>Problème véhicule</option><option>Route / circulation</option><option>Paiement</option><option>Autre</option></select><textarea id="incidentText" class="input field" style="height:100px;padding-top:12px" placeholder="Décrivez la situation"></textarea><button class="btn primary wide" style="margin-top:10px" onclick="submitIncident()">Envoyer</button>')}
-async function submitIncident(){
-  const type=document.getElementById('incidentType')?.value||'Autre',description=document.getElementById('incidentText')?.value.trim()||'';
-  if(validBackend()&&isUuid(current?.id)){try{await sb.from('ride_incidents').insert({ride_id:isUuid(currentRide?.id)?currentRide.id:null,driver_id:current.id,type,description,status:'open'})}catch(e){}}
-  closeModal();toast('Incident transmis à NZILA')
-}
-function openNavigation(){toast('Navigation externe à connecter — GPS NZILA prêt pour intégration')}
-function showModal(content){document.getElementById('modalContent').innerHTML=content;document.getElementById('modal').classList.add('show')}
-function closeModal(){document.getElementById('modal').classList.remove('show')}
-function initMaps(){
-  if(!window.L)return;
-  if(!mainMap){mainMap=L.map('mainMap').setView([-4.2634,15.2429],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mainMap);L.marker([-4.2634,15.2429]).addTo(mainMap).bindPopup('Position chauffeur').openPopup()}
-  if(!rideMap){rideMap=L.map('rideMap').setView([-4.2634,15.2429],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(rideMap);L.marker([-4.2634,15.2429]).addTo(rideMap).bindPopup('Point de prise en charge')}
-}
-function boot(){
-  try{const s=JSON.parse(localStorage.getItem(SESSION)||'null');if(s&&accounts().some(x=>x.id===s.id)){current=s;openApp()}}catch{}
-}
+async function submitIncident(){const type=$('incidentType')?.value||'Autre',description=$('incidentText')?.value.trim()||'';if(!description)return toast('Décrivez l’incident.');try{const p=await getCurrentPosition();const mapType=type==='Accident'?'accident':type==='Paiement'?'security':'other';const {error}=await sb.rpc('nzila_trigger_sos',{p_user_id:current.id,p_ride_id:isUuid(currentRide?.id)?currentRide.id:null,p_type:mapType,p_latitude:p.coords.latitude,p_longitude:p.coords.longitude,p_accuracy:p.coords.accuracy||null,p_message:description});if(error)throw error;closeModal();toast('Incident transmis à NZILA')}catch(e){toast('Incident : '+(e.message||'échec'))}}
+function openNavigation(){if(currentRide?.db?.pickup_latitude&&currentRide?.db?.pickup_longitude){const u='https://www.google.com/maps/dir/?api=1&destination='+currentRide.db.pickup_latitude+','+currentRide.db.pickup_longitude;window.open(u,'_blank','noopener')}else toast('Navigation externe : coordonnées du point de prise en charge indisponibles.')}
+function showModal(content){$('modalContent').innerHTML=content;$('modal').classList.add('show')}
+function closeModal(){$('modal').classList.remove('show')}
+function initMaps(){if(!window.L)return;if(!mainMap){mainMap=L.map('mainMap').setView([-4.2634,15.2429],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mainMap)}if(!rideMap){rideMap=L.map('rideMap').setView([-4.2634,15.2429],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(rideMap)}}
+function renderRides(){const rows=[];if(currentRide)rows.push(currentRide);$('recentRides').innerHTML=rows.length?rows.map(r=>'<div class="listItem"><div><b>Course #'+String(r.id).slice(0,8)+'</b><small>'+esc(r.pickup)+' → '+esc(r.destination)+'</small></div><span class="amount">'+money(r.price)+'</span></div>').join(''):'<div class="card">Aucune course récente synchronisée.</div>';$('allRides').innerHTML=$('recentRides').innerHTML}
+function loadChart(){const vals=[35,48,31,62,55,72,64];$('chart').innerHTML=vals.map((v,i)=>'<div style="flex:1;text-align:center;height:100%"><div class="barWrap"><div class="bar" style="height:'+v+'%"></div></div><div class="barLabel">'+['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]+'</div></div>').join('')}
+function boot(){try{const s=JSON.parse(localStorage.getItem(SESSION)||'null');if(s?.id&&isUuid(s.id)){$('loginPhone').value=s.phone?.replace('+242','')||'';msg('Votre dernière session est mémorisée. Reconnectez-vous pour continuer.')}}catch{}}
 boot();
-
 </script>
 </body>
 </html>

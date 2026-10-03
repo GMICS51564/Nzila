@@ -56,10 +56,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden
     </div>
 
     <div id="loginForm">
-      <div class="phone-field" style="display:flex;align-items:center;margin-bottom:9px">
-  <span style="padding:0 12px;font-weight:700;color:#555;background:#f3f3f3;border:1px solid #ddd;border-right:0;border-radius:10px 0 0 10px;height:44px;display:flex;align-items:center">+242</span>
-  <input id="email" class="input" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Votre numéro" style="margin-bottom:0;border-radius:0 10px 10px 0;flex:1">
-</div>
+      
       <input id="password" class="input" type="password" placeholder="Mot de passe" style="margin-top:8px">
       <button class="primary" style="margin-top:12px" onclick="login()">Entrer dans le cockpit</button>
     </div>
@@ -263,8 +260,43 @@ async function applyDriver(){
   const accounts=nzilaDriverAccounts();
   if(accounts.some(a=>a.phone===phone))return authMsg('Ce numéro est déjà utilisé pour un compte chauffeur.');
   const u={id:'local-driver-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),phone,first_name:v('aFirst'),last_name:v('aLast'),license_number:v('aLicense'),vehicle_make:v('aMake'),vehicle_model:v('aModel'),vehicle_plate:v('aPlate'),vehicle_color:v('aColor'),role:'driver',verification_status:'pending',created_at:new Date().toISOString()};
-  accounts.push({...u,password});saveNzilaDriverAccounts(accounts);localStorage.setItem('nzila_driver_session',JSON.stringify(u));
-  authMsg('Inscription enregistrée. Votre candidature est en attente de validation NZILA.');
+  accounts.push({...u,password});
+  saveNzilaDriverAccounts(accounts);
+  localStorage.setItem('nzila_driver_session',JSON.stringify(u));
+
+  // Inscription terminée : aucune validation d'inscription.
+  // Le chauffeur est immédiatement connecté et envoyé vers l'accueil.
+  user=u;
+  profile={
+    id:u.id,
+    first_name:u.first_name||'',
+    last_name:u.last_name||'',
+    phone:u.phone||'',
+    role:'driver',
+    is_active:true
+  };
+  driver={
+    id:u.id,
+    verification_status:'pending',
+    online:false,
+    rating:5,
+    total_rides:0
+  };
+
+  document.getElementById('auth').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  renderProfile();
+  renderOnline();
+  initMap();
+  loadDashboard();
+  loadMyRides();
+  loadWallet();
+  loadDocuments();
+  loadNotifications();
+  subscribe();
+
+  if(typeof openPage==='function') openPage('home');
 }
 async function boot(u){
   user=u;profile={id:u.id,first_name:u.first_name||'',last_name:u.last_name||'',phone:u.phone||'',role:'driver',is_active:true};

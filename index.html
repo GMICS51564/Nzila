@@ -423,4 +423,6 @@ function savePrefs(){localStorage.setItem('nzila_preferences',JSON.stringify({no
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('nzila_preferences')||'{}');if(p.notif!==undefined)$('prefNotif').checked=p.notif;if(p.gps!==undefined)$('prefGps').checked=p.gps;if(p.confirm!==undefined)$('prefConfirm').checked=p.confirm}catch{}}
 const _openPageClient=openPage;openPage=function(p){_openPageClient(p);if(p==='tracking')setTimeout(refreshTracking,150);if(p==='activity')loadActivity();if(p==='preferences')loadPrefs()};
 </script>
+
+<script type="module" src="client/app-v2.js"></script>
 </body></html>

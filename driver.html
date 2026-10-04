@@ -524,5 +524,7 @@ async function checkDriverGps(){if(!navigator.geolocation)return $('driverGpsSta
 async function loadDriverPlusActivity(){if(!current?.id)return;const r=await sb.from('rides').select('*').eq('driver_id',current.id).order('created_at',{ascending:false}).limit(30);$('driverPlusActivity').innerHTML=r.data?.length?r.data.map(x=>'<div class="listItem"><div><b>#'+String(x.id).slice(0,8)+'</b><small>'+esc(x.pickup_address||'')+' → '+esc(x.destination_address||'')+'</small></div><span>'+money(x.final_price||x.estimated_price||0)+'</span></div>').join(''):'<p class="muted">Aucune course.</p>'}
 const _openPageDriver=openPage;openPage=function(p){_openPageDriver(p);if(p==='driverStats')loadDriverPlusStats();if(p==='vehicleCheck')loadVehicleCheck();if(p==='driverSecurity')checkDriverGps();if(p==='driverActivity')loadDriverPlusActivity()};
 </script>
+
+<script type="module" src="driver/app-v2.js"></script>
 </body>
 </html>

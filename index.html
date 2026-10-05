@@ -38,7 +38,7 @@
 <label class="label">Ville / localité</label><input id="city" class="input field" placeholder="Ex. Brazzaville, Dolisie..."><label class="label">Quartier</label><input id="neighborhood" class="input field" placeholder="Ex. Moungali, Mfilou...">
 <label class="label">Raccourcis</label><div class="quick"><button onclick="setQuick('home')">🏠 Domicile</button><button onclick="setQuick('work')">💼 Travail</button><button onclick="setQuick('center')">📍 Centre-ville</button><button onclick="openPage('favorites')">⭐ Favoris</button></div>
 <div class="mapbox"><div class="mapbadge">◉ Zone sélectionnée</div><div id="map"></div></div>
-<label class="label">Départ</label><div class="loc field"><div class="dot"></div><input id="pickup" class="input" placeholder="Point de départ"></div><label class="label">Destination</label><div class="loc field"><div class="dot end"></div><input id="destination" class="input" placeholder="Où souhaitez-vous aller ?"></div>
+<label class="label">Départ</label><div class="loc field"><div class="dot"></div><input id="pickup" class="input" placeholder="Point de départ"></div><div class="geoRow"><button type="button" class="secondary geoBtn" onclick="geolocateClient()">📍 Me géolocaliser</button><span id="geoStatus" class="muted geoStatus">Position non définie</span></div><label class="label">Destination</label><div class="loc field"><div class="dot end"></div><input id="destination" class="input" placeholder="Où souhaitez-vous aller ?"></div>
 <label class="label">Quand ?</label><div class="seg"><button id="nowBtn" class="active" onclick="setMode('now')">⚡ Maintenant</button><button id="scheduleBtn" onclick="setMode('schedule')">🗓 Programmer</button></div><div id="scheduleFields" class="opts hidden"><input id="rideDate" class="input" type="date"><input id="rideTime" class="input" type="time" value="08:00"></div>
 <label class="label" style="margin-top:15px">Pour qui ?</label><div class="seg"><button id="meBtn" class="active" onclick="setPassengerType('me')">👤 Pour moi</button><button id="otherBtn" onclick="setPassengerType('other')">👥 Quelqu'un d'autre</button></div><div id="otherFields" class="opts hidden"><input id="otherName" class="input" placeholder="Nom"><input id="otherPhone" class="input" placeholder="Téléphone"></div>
 <div class="opts"><div class="opt"><strong>👥 Passagers</strong><small>Nombre de personnes</small><div class="counter"><button onclick="changePassengers(-1)">−</button><b id="passengerCount">1</b><button onclick="changePassengers(1)">+</button></div></div><div class="opt"><strong>🧳 Bagages</strong><small>Nombre</small><div class="bags"><button class="bag active" onclick="bag(this,1)">1</button><button class="bag" onclick="bag(this,2)">2</button><button class="bag" onclick="bag(this,3)">3</button><button class="bag" onclick="bag(this,4)">4</button><button class="bag" onclick="bag(this,5)">5+</button></div></div></div>
@@ -149,11 +149,10 @@ function setPassengerType(t){passengerType=t;$('meBtn').classList.toggle('active
 function changePassengers(n){passengers=Math.max(1,Math.min(8,passengers+n));$('passengerCount').textContent=passengers}
 function bag(el,n){bags=n;document.querySelectorAll('.bag').forEach(x=>x.classList.remove('active'));el.classList.add('active')}
 function price(){return 2500+Math.max(0,passengers-1)*500+Math.max(0,bags-1)*300+(mode==='schedule'?500:0)}
-function getCurrentPosition(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('GPS indisponible'));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000,maximumAge:10000})})}
-async function getPickupCoords(){
-  try{const p=await getCurrentPosition();return [p.coords.latitude,p.coords.longitude]}
-  catch{const d=$('department').value;return coords[d]||coords.Brazzaville}
-}
+let clientGpsCoords=null,clientGpsAccuracy=null,clientGpsAt=null,clientGpsMarker=null;
+function getCurrentPosition(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('GPS indisponible'));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:10000,maximumAge:5000})})}
+async function geolocateClient(){try{const p=await getCurrentPosition();clientGpsCoords=[p.coords.latitude,p.coords.longitude];clientGpsAccuracy=p.coords.accuracy||null;clientGpsAt=Date.now();if(map){map.flyTo(clientGpsCoords,16,{duration:1});if(clientGpsMarker)clientGpsMarker.setLatLng(clientGpsCoords);else clientGpsMarker=L.marker(clientGpsCoords).addTo(map).bindPopup('📍 Votre position').openPopup()}$('pickup').value='Ma position actuelle';$('geoStatus').textContent=clientGpsAccuracy?`Position obtenue · précision ±${Math.round(clientGpsAccuracy)} m`:'Position obtenue';$('geoStatus').classList.add('ok');toast('📍 Position GPS enregistrée pour le départ.')}catch(e){$('geoStatus').textContent='Localisation refusée ou indisponible';$('geoStatus').classList.remove('ok');toast('GPS : '+(e.message||'autorisation nécessaire'))}}
+async function getPickupCoords(){if(clientGpsCoords&&clientGpsAt&&Date.now()-clientGpsAt<60000)return clientGpsCoords;try{const p=await getCurrentPosition();clientGpsCoords=[p.coords.latitude,p.coords.longitude];clientGpsAccuracy=p.coords.accuracy||null;clientGpsAt=Date.now();if($('geoStatus')){$('geoStatus').textContent=clientGpsAccuracy?`Position obtenue · précision ±${Math.round(clientGpsAccuracy)} m`:'Position obtenue';$('geoStatus').classList.add('ok')}return clientGpsCoords}catch{const d=$('department').value;return coords[d]||coords.Brazzaville}}
 async function createRide(){
   if(!user?.id)return;
   const department=$('department').value,pickup=$('pickup').value.trim(),destination=$('destination').value.trim();
@@ -260,14 +259,8 @@ async function ensureRidePayment(ride){
   if(error)console.warn('Paiement NZILA:',error.message);
 }
 
-function showRideModal(r){
-  if(!r)return;
-  activeRideId=r.id;
-  $('rideModalTitle').textContent=labelStatus(r.status);
-  $('rideBox').innerHTML='<strong>'+esc(r.pickup_address)+' → '+esc(r.destination_address)+'</strong><br><span class="muted">'+labelStatus(r.status)+'</span>'+(r.driver_id?'<br><span class="muted">Chauffeur assigné · suivi GPS actif</span>':'');
-  $('rideModalBtn').textContent=r.status==='completed'?'Voir mes trajets':'Fermer';
-  $('rideModal').classList.add('show');
-}
+function showRideModal(r){if(!r)return;activeRideId=r.id;const searching=['requested','searching'].includes(r.status);$('rideModalTitle').textContent=labelStatus(r.status);$('rideBox').innerHTML='<strong>'+esc(r.pickup_address)+' → '+esc(r.destination_address)+'</strong><br><span class="muted">'+labelStatus(r.status)+'</span>'+(r.driver_id?'<br><span class="muted">Chauffeur assigné · suivi GPS actif</span>':'')+(searching?'<br><span class="muted">NZILA cherche le chauffeur le plus proche de votre position.</span>':'');$('rideModalBtn').textContent=r.status==='completed'?'Voir mes trajets':'Fermer';const existing=document.getElementById('cancelSearchBtn');if(existing)existing.remove();if(searching){const b=document.createElement('button');b.id='cancelSearchBtn';b.className='cancelSearch';b.textContent='✕ Annuler la recherche';b.onclick=cancelSearch;b.type='button';$('rideModal').querySelector('.sheet').appendChild(b)}$('rideModal').classList.add('show');}
+async function cancelSearch(){if(!activeRideId)return toast('Aucune recherche active.');if(!confirm('Annuler la recherche de chauffeur ?'))return;const id=activeRideId;const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:id,p_status:'cancelled'});if(error)return toast('Impossible d’annuler : '+nzcErr(error));activeRideId=null;localStorage.removeItem('nzila_active_ride');if(rideChannel)try{sb.removeChannel(rideChannel)}catch{}rideChannel=null;const b=document.getElementById('cancelSearchBtn');if(b)b.remove();$('rideModal').classList.remove('show');toast('Recherche annulée.');if(typeof refreshTracking==='function')refreshTracking()}
 function closeRideModal(){
   if($('rideModalBtn').textContent==='Voir mes trajets')openPage('completed');
   $('rideModal').classList.remove('show');
@@ -425,7 +418,4 @@ const _openPageClient=openPage;openPage=function(p){_openPageClient(p);if(p==='t
 </script>
 
 <script type="module" src="client/app-v2.js"></script>
-  <!-- NZILA V2 - Modules Client -->
-<script type="module" src="./client/app-v2.js"></script>
-<script type="module" src="./client/routing.js"></script>
 </body></html>

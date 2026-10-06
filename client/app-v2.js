@@ -1,4 +1,4 @@
-import { osrmRoute, geocodeCongo } from '../Asset/JS/nzila-utils.js';
+import { osrmRoute, geocodeCongo } from '../assets/js/nzila-utils.js';
 import { flushClientQueue, queueClientAction } from './offline.js';
 
 const sb = window.supabaseClient || window.sb;

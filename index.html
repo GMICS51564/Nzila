@@ -127,23 +127,41 @@ let clientGpsCoords=null,clientGpsAccuracy=null,clientGpsAt=null,clientGpsMarker
 let clientLocationMode='manual'; window.clientLocationMode='manual';
 
 function setLocationMode(modeName){
-  clientLocationMode=modeName==='gps'?'gps':'manual'; window.clientLocationMode=clientLocationMode;
+  clientLocationMode=modeName==='gps'?'gps':'manual';
+  window.clientLocationMode=clientLocationMode;
+
   $('manualLocationBtn')?.classList.toggle('active',clientLocationMode==='manual');
   $('gpsLocationBtn')?.classList.toggle('active',clientLocationMode==='gps');
-  const fields=['department','city','neighborhood','pickup'];
-  fields.forEach(id=>{
-    const el=$(id); if(!el)return;
-    el.disabled=clientLocationMode==='gps';
-    el.classList.toggle('locationDisabled',clientLocationMode==='gps');
-  });
+
+  const manualFields=$('manualLocationFields');
+
   if(clientLocationMode==='gps'){
+    // GPS = mode exclusif : aucun champ manuel visible ni utilisable.
+    manualFields?.classList.add('hidden');
     geolocateClient();
-  }else{
-    clientGpsCoords=null; clientGpsAccuracy=null; clientGpsAt=null;
-    if($('geoStatus')){ $('geoStatus').textContent='Départ manuel sélectionné'; $('geoStatus').classList.remove('ok'); }
-    if($('pickup')?.value==='Ma position actuelle')$('pickup').value='';
-    toast('✍️ Renseignez votre point de départ manuellement.');
+    return;
   }
+
+  // Manuel = on réaffiche tout le formulaire de départ.
+  manualFields?.classList.remove('hidden');
+  clientGpsCoords=null;
+  clientGpsAccuracy=null;
+  clientGpsAt=null;
+
+  ['department','city','neighborhood','pickup'].forEach(id=>{
+    const el=$(id);
+    if(!el)return;
+    el.disabled=false;
+    el.classList.remove('locationDisabled');
+  });
+
+  if($('geoStatus')){
+    $('geoStatus').textContent='Départ manuel sélectionné';
+    $('geoStatus').classList.remove('ok');
+  }
+
+  if($('pickup')?.value==='Ma position actuelle')$('pickup').value='';
+  toast('✍️ Renseignez votre point de départ manuellement.');
 }
 
 function getCurrentPosition(){
@@ -154,10 +172,15 @@ function getCurrentPosition(){
 }
 
 async function geolocateClient(){
-  clientLocationMode='gps'; window.clientLocationMode=clientLocationMode;
+  clientLocationMode='gps';
+  window.clientLocationMode='gps';
   $('manualLocationBtn')?.classList.remove('active');
   $('gpsLocationBtn')?.classList.add('active');
-  ['department','city','neighborhood','pickup'].forEach(id=>{const el=$(id);if(el){el.disabled=true;el.classList.add('locationDisabled')}});
+  $('manualLocationFields')?.classList.add('hidden');
+  ['department','city','neighborhood','pickup'].forEach(id=>{
+    const el=$(id);
+    if(el){el.disabled=true;el.classList.add('locationDisabled');}
+  });
   try{
     const p=await getCurrentPosition();
     clientGpsCoords=[p.coords.latitude,p.coords.longitude];
@@ -174,7 +197,16 @@ async function geolocateClient(){
     toast('📍 Position GPS enregistrée pour le départ.');
     return clientGpsCoords;
   }catch(e){
-    setLocationMode('manual');
+    // Échec GPS : retour propre au mode manuel sans boucle récursive.
+    clientLocationMode='manual';
+    window.clientLocationMode='manual';
+    $('manualLocationBtn')?.classList.add('active');
+    $('gpsLocationBtn')?.classList.remove('active');
+    $('manualLocationFields')?.classList.remove('hidden');
+    ['department','city','neighborhood','pickup'].forEach(id=>{
+      const el=$(id);
+      if(el){el.disabled=false;el.classList.remove('locationDisabled');}
+    });
     $('geoStatus').textContent='GPS indisponible — mode manuel activé';
     toast('GPS : '+(e.message||'autorisation nécessaire'));
     throw e;

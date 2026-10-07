@@ -302,7 +302,7 @@ async function login(){
   }catch(e){msg(String(e.message||e))}
 }
 async function openApp(){
-  $('auth').classList.add('hidden');$('app').classList.remove('hidden');$('hello').textContent='Bonjour '+(current.first_name||'chauffeur')+' 👋';online=!!current.online;renderOnline();renderProfile();renderRides();await loadStatsFromBackend();await loadWallet();loadChart();initMaps();loadNotifications();subscribeNotifications();if(online){startGps();await subscribeDriverOffers()}
+  $('auth').classList.add('hidden');$('app').classList.remove('hidden');$('hello').textContent='Bonjour '+(current.first_name||'chauffeur')+' 👋';online=!!current.online;renderOnline();renderProfile();renderRides();await loadStatsFromBackend();await loadWallet();loadChart();initMaps();loadNotifications();subscribeNotifications();if(online){startGps();subscribeDriverOffers()}
 }
 function logout(){stopGps();unsubscribeDriverOffers();if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};online=false;localStorage.removeItem(SESSION);$('app').classList.add('hidden');$('auth').classList.remove('hidden');authMode('login')}
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(()=>e.classList.remove('show'),2800)}
@@ -317,7 +317,8 @@ async function toggleOnline(){
 }
 function startGps(){if(!navigator.geolocation||gpsWatch)return;gpsWatch=navigator.geolocation.watchPosition(async pos=>{const c=pos.coords;if(mainMap)mainMap.setView([c.latitude,c.longitude],Math.max(mainMap.getZoom(),14));if(!isUuid(current?.id))return;const {error}=await sb.rpc('nzila_update_driver_location',{p_driver_id:current.id,p_latitude:c.latitude,p_longitude:c.longitude,p_accuracy:c.accuracy||null,p_speed:c.speed||null,p_heading:c.heading||null});if(error)console.warn('GPS NZILA:',error.message)},()=>toast('Autorisez la localisation pour recevoir les courses proches.'),{enableHighAccuracy:true,maximumAge:5000,timeout:10000})}
 function stopGps(){if(gpsWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(gpsWatch);gpsWatch=null}}
-/* Ancienne logique d'offres retirée en V1.2 : la logique active est définie plus bas. */
+function subscribeDriverOffers(){if(!validBackend()||!isUuid(current?.id))return;unsubscribeDriverOffers();driverOfferChannel=sb.channel('driver-rides-'+current.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'driver_id=eq.'+current.id},p=>{if(['accepted','driver_arriving','arrived','in_progress'].includes(p.new.status)){loadRide(p.new);toast('🚕 Course NZILA assignée.') }if(p.new.status==='completed'||p.new.status==='cancelled'){currentRide=null;$('offerSection').classList.add('hidden');loadStatsFromBackend();renderRides()}}).subscribe()}
+function unsubscribeDriverOffers(){if(driverOfferChannel){try{sb.removeChannel(driverOfferChannel)}catch{}driverOfferChannel=null}}
 async function loadRide(r){currentRide={id:r.id,pickup:r.pickup_address||'Point de prise en charge',destination:r.destination_address||'Destination',price:Number(r.final_price??r.estimated_price??0),distance:r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—',db:r};renderOfferFromRide();$('offerSection').classList.remove('hidden')}
 function renderOfferFromRide(){if(!currentRide)return;const card=document.querySelector('#offerSection .offer');if(!card)return;card.querySelector('.offerTop b').textContent='Course #'+String(currentRide.id).slice(0,8);card.querySelector('.offerTop .muted').textContent='Course assignée par NZILA';card.querySelector('.price').textContent=money(currentRide.price);const route=card.querySelectorAll('.routeText');if(route[0])route[0].querySelector('b').textContent=currentRide.pickup;if(route[1])route[1].querySelector('b').textContent=currentRide.destination;const meta=card.querySelector('.muted[style*="margin-bottom"]');if(meta)meta.textContent='Course NZILA · '+currentRide.distance+' estimés'}
 function showOffer(){if(online&&!currentRide){$('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')}}
@@ -355,122 +356,29 @@ boot();
 const NZD={offerChannel:null,notificationChannel:null,initialized:false};
 function nzdErr(e){return String(e?.message||e||'Erreur').replace('Error: ','')}
 
-async function fetchPendingDriverOffer(){
-  if(!validBackend()||!isUuid(current?.id)||!online)return false;
-  const {data:offers,error}=await sb.from('ride_offers')
-    .select('*')
-    .eq('driver_id',current.id)
-    .eq('status','pending')
-    .order('created_at',{ascending:false})
-    .limit(1);
-  if(error){console.warn('NZILA pending offer:',error.message);return false}
-  const offer=offers?.[0];
-  if(!offer)return false;
-  if(offer.expires_at && new Date(offer.expires_at).getTime()<=Date.now())return false;
-  await showDriverOffer(offer,false);
-  return true;
-}
-
-async function showDriverOffer(offer,notify=true){
-  if(!offer?.ride_id||offer.status!=='pending')return;
-  const {data:r,error}=await sb.from('rides').select('*').eq('id',offer.ride_id).maybeSingle();
-  if(error||!r){if(error)console.warn('NZILA ride offer:',error.message);return}
-  if(['completed','cancelled'].includes(r.status))return;
-  activeOffer=offer;
-  currentRide={
-    id:r.id,
-    pickup:r.pickup_address||'Point de prise en charge',
-    destination:r.destination_address||'Destination',
-    price:Number(r.final_price??r.estimated_price??0),
-    distance:offer.distance_km!=null?Number(offer.distance_km).toFixed(1)+' km':(r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—'),
-    db:r,
-    offer_id:offer.id
-  };
-  renderOfferFromRide();
-  $('offerSection').classList.remove('hidden');
-  openPage('home');
-  if(notify)toast('🚕 Nouvelle course disponible.');
-}
-
-async function loadPendingDriverOffer(){
-  if(!validBackend()||!isUuid(current?.id)||!online)return false;
-  const {data:offers,error}=await sb.from('ride_offers')
-    .select('*')
-    .eq('driver_id',current.id)
-    .eq('status','pending')
-    .order('created_at',{ascending:false})
-    .limit(10);
-  if(error){console.warn('NZILA offres en attente :',error.message);return false;}
-  const now=Date.now();
-  const offer=(offers||[]).find(o=>!o.expires_at || new Date(o.expires_at).getTime()>now);
-  if(!offer)return false;
-  const {data:r,error:rideError}=await sb.from('rides').select('*').eq('id',offer.ride_id).maybeSingle();
-  if(rideError||!r){if(rideError)console.warn('NZILA course offre :',rideError.message);return false;}
-  currentRide={
-    id:r.id,
-    pickup:r.pickup_address||'Point de prise en charge',
-    destination:r.destination_address||'Destination',
-    price:Number(r.final_price??r.estimated_price??0),
-    distance:offer.distance_km!=null?Number(offer.distance_km).toFixed(1)+' km':(r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—'),
-    db:r,
-    offer_id:offer.id
-  };
-  renderOfferFromRide();
-  $('offerSection').classList.remove('hidden');
-  return true;
-}
-
 async function subscribeDriverOffers(){
   if(!validBackend()||!isUuid(current?.id))return;
-  unsubscribeDriverOffers();
-  driverOfferChannel=sb.channel('nzila-driver-offers-'+current.id)
+  if(NZD.offerChannel)try{sb.removeChannel(NZD.offerChannel)}catch{}
+  NZD.offerChannel=sb.channel('nzila-driver-offers-'+current.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+current.id},async p=>{
       if(p.new?.status!=='pending')return;
-      const offer=p.new;
-      if(offer.expires_at && new Date(offer.expires_at).getTime()<=Date.now())return;
-      const {data:r,error}=await sb.from('rides').select('*').eq('id',offer.ride_id).maybeSingle();
-      if(error||!r){if(error)console.warn('NZILA nouvelle offre :',error.message);return;}
-      currentRide={
-        id:r.id,
-        pickup:r.pickup_address||'Point de prise en charge',
-        destination:r.destination_address||'Destination',
-        price:Number(r.final_price??r.estimated_price??0),
-        distance:offer.distance_km!=null?Number(offer.distance_km).toFixed(1)+' km':(r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—'),
-        db:r,
-        offer_id:offer.id
-      };
-      renderOfferFromRide();
-      $('offerSection').classList.remove('hidden');
-      openPage('home');
-      toast('🚕 Nouvelle course disponible.');
-    })
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+current.id},p=>{
-      if(p.new?.id!==currentRide?.offer_id)return;
-      if(p.new.status!=='pending'){
-        $('offerSection').classList.add('hidden');
-        if(p.new.status!=='accepted')currentRide=null;
-      }
+      const {data:r}=await sb.from('rides').select('*').eq('id',p.new.ride_id).maybeSingle();
+      if(r){currentRide={id:r.id,pickup:r.pickup_address||'Point de prise en charge',destination:r.destination_address||'Destination',price:Number(r.final_price??r.estimated_price??0),distance:p.new.distance_km!=null?Number(p.new.distance_km).toFixed(1)+' km':'—',db:r,offer_id:p.new.id};renderOfferFromRide();$('offerSection').classList.remove('hidden');toast('🚕 Nouvelle course disponible.')}
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'driver_id=eq.'+current.id},p=>{
       if(p.new?.id!==currentRide?.id)return;
-      if(['accepted','driver_arriving','arrived','in_progress'].includes(p.new.status))loadRide(p.new);
-      if(['completed','cancelled'].includes(p.new.status)){currentRide=null;$('offerSection').classList.add('hidden');loadStatsFromBackend();loadWallet();renderRides();}
-    })
-    .subscribe(async status=>{
-      if(status==='SUBSCRIBED'){
-        const found=await loadPendingDriverOffer();
-        if(found)toast('🚕 Une course est disponible.');
-      }
-    });
+      if(['accepted','driver_arriving','arrived','in_progress'].includes(p.new.status)){loadRide(p.new)}
+      if(['completed','cancelled'].includes(p.new.status)){currentRide=null;$('offerSection').classList.add('hidden');loadStatsFromBackend();loadWallet();renderRides()}
+    }).subscribe();
 }
-function unsubscribeDriverOffers(){if(driverOfferChannel)try{sb.removeChannel(driverOfferChannel)}catch{};driverOfferChannel=null;if(NZD.offerChannel)try{sb.removeChannel(NZD.offerChannel)}catch{};NZD.offerChannel=null}
+function unsubscribeDriverOffers(){if(NZD.offerChannel)try{sb.removeChannel(NZD.offerChannel)}catch{};NZD.offerChannel=null}
 
 async function toggleOnline(){
   const next=!online;
   const {error}=await sb.rpc('nzila_set_driver_online',{p_driver_id:current.id,p_online:next});
   if(error){return toast('Impossible de modifier votre disponibilité : '+nzdErr(error))}
   online=next;current.online=next;current.availability_status=next?'online':'offline';saveCurrent();renderOnline();
-  if(next){startGps();await subscribeDriverOffers();toast('Vous êtes maintenant en ligne.')}else{stopGps();unsubscribeDriverOffers();$('offerSection').classList.add('hidden');currentRide=null;toast('Vous êtes hors ligne.')}
+  if(next){startGps();subscribeDriverOffers();toast('Vous êtes maintenant en ligne.')}else{stopGps();unsubscribeDriverOffers();$('offerSection').classList.add('hidden');currentRide=null;toast('Vous êtes hors ligne.')}
 }
 function startGps(){
   if(!navigator.geolocation||gpsWatch)return;
@@ -496,7 +404,7 @@ async function rejectOffer(){
   const rideId=currentRide.id;$('offerSection').classList.add('hidden');
   const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:rideId,p_driver_id:current.id});
   if(error){$('offerSection').classList.remove('hidden');return toast('Impossible de refuser : '+nzdErr(error))}
-  activeOffer=null;currentRide=null;toast('Course refusée.');
+  currentRide=null;toast('Course refusée.');
 }
 async function acceptOffer(){
   if(!currentRide)return toast('Aucune course disponible.');
@@ -505,7 +413,7 @@ async function acceptOffer(){
   if(error)return toast('Impossible d’accepter : '+nzdErr(error));
   const {data:r}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
   if(r)currentRide={...currentRide,db:r,pickup:r.pickup_address,destination:r.destination_address,price:Number(r.final_price??r.estimated_price??0)};
-  activeOffer=null;rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée.');
+  rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée.');
 }
 async function arrived(){
   if(!currentRide)return;
@@ -584,7 +492,7 @@ function openPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.r
 async function nzdRestore(){
   const s=(()=>{try{return JSON.parse(localStorage.getItem(SESSION)||'null')}catch{return null}})();if(!s?.id)return;
   current=s;const {data}=await sb.from('profiles').select('*').eq('id',s.id).maybeSingle();if(data)current={...current,...data};const {data:dp}=await sb.from('driver_profiles').select('*').eq('id',s.id).maybeSingle();if(dp)current={...current,...dp};online=!!current.online;
-  $('auth').classList.add('hidden');$('app').classList.remove('hidden');renderOnline();renderProfile();initMaps();loadStatsFromBackend();loadWallet();loadNotifications();renderRides();subscribeNotifications();if(online){startGps();await subscribeDriverOffers()}
+  $('auth').classList.add('hidden');$('app').classList.remove('hidden');renderOnline();renderProfile();initMaps();loadStatsFromBackend();loadWallet();loadNotifications();renderRides();subscribeNotifications();if(online){startGps();subscribeDriverOffers()}
   const {data:r}=await sb.from('rides').select('*').eq('driver_id',current.id).in('status',['accepted','driver_arriving','arrived','in_progress']).order('updated_at',{ascending:false}).limit(1).maybeSingle();if(r)loadRide(r);
 }
 function nzdWireButtons(){
@@ -602,5 +510,179 @@ setTimeout(nzdRestore,0);setTimeout(nzdWireButtons,100);
   <!-- NZILA V2 - Modules Driver -->
 <script type="module" src="./gps.js"></script>
 <script type="module" src="./offline.js"></script>
+
+<script>
+/* NZILA DRIVER V1.3 — offres visibles partout : Accueil / Courses / Notifications */
+async function nzdFetchOffer(offer){
+  if(!offer || offer.status!=='pending') return null;
+  const {data:r,error}=await sb.from('rides').select('*').eq('id',offer.ride_id).maybeSingle();
+  if(error) { console.warn('NZILA offer ride:', error.message); return null; }
+  if(!r) return null;
+  activeOffer=offer;
+  currentRide={
+    id:r.id,
+    pickup:r.pickup_address||'Point de prise en charge',
+    destination:r.destination_address||'Destination',
+    price:Number(r.final_price??r.estimated_price??0),
+    distance:offer.distance_km!=null?Number(offer.distance_km).toFixed(1)+' km':(r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—'),
+    db:r,
+    offer_id:offer.id
+  };
+  renderOfferFromRide();
+  $('offerSection').classList.remove('hidden');
+  return currentRide;
+}
+
+async function nzdLoadPendingOffer(){
+  if(!isUuid(current?.id) || !online) return null;
+  const {data,error}=await sb.from('ride_offers').select('*')
+    .eq('driver_id',current.id)
+    .eq('status','pending')
+    .order('created_at',{ascending:false})
+    .limit(10);
+  if(error){console.warn('NZILA pending offers:',error.message);return null;}
+  for(const offer of (data||[])){
+    const r=await nzdFetchOffer(offer);
+    if(r) return r;
+  }
+  return null;
+}
+
+async function subscribeDriverOffers(){
+  if(!validBackend()||!isUuid(current?.id)) return;
+  if(NZD.offerChannel) try{await sb.removeChannel(NZD.offerChannel)}catch{}
+  NZD.offerChannel=sb.channel('nzila-driver-offers-live-'+current.id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+current.id},async payload=>{
+      if(payload.new?.status!=='pending') return;
+      await nzdFetchOffer(payload.new);
+      toast('🚕 Nouvelle course disponible.');
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'ride_offers',filter:'driver_id=eq.'+current.id},async payload=>{
+      if(payload.new?.id!==activeOffer?.id) return;
+      if(payload.new.status!=='pending'){
+        activeOffer=null;
+        if(payload.new.status!=='accepted'){
+          currentRide=null;
+          $('offerSection').classList.add('hidden');
+          renderRides();
+        }
+      }
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'driver_id=eq.'+current.id},async payload=>{
+      if(payload.new?.id!==currentRide?.id) return;
+      if(['accepted','driver_arriving','arrived','in_progress'].includes(payload.new.status)){
+        await loadRide(payload.new);
+        toast('🚕 Course NZILA assignée.');
+      }
+      if(['completed','cancelled'].includes(payload.new.status)){
+        currentRide=null;activeOffer=null;$('offerSection').classList.add('hidden');
+        await loadStatsFromBackend();await loadWallet();renderRides();
+      }
+    })
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED') nzdLoadPendingOffer();
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') console.warn('NZILA Realtime offres:',status);
+    });
+  await nzdLoadPendingOffer();
+}
+
+async function toggleOnline(){
+  const next=!online;
+  const {error}=await sb.rpc('nzila_set_driver_online',{p_driver_id:current.id,p_online:next});
+  if(error)return toast('Impossible de modifier votre disponibilité : '+nzdErr(error));
+  online=next;current.online=next;current.availability_status=next?'online':'offline';saveCurrent();renderOnline();
+  if(next){startGps();await subscribeDriverOffers();await renderRides();toast('Vous êtes maintenant en ligne.');}
+  else{stopGps();unsubscribeDriverOffers();activeOffer=null;currentRide=null;$('offerSection').classList.add('hidden');await renderRides();toast('Vous êtes hors ligne.');}
+}
+
+async function openPendingOffer(){
+  const r=await nzdLoadPendingOffer();
+  if(!r) return toast('Aucune course disponible actuellement.');
+  renderOfferFromRide();
+  $('offerSection').classList.remove('hidden');
+  openPage('home');
+}
+
+async function openNotification(id){
+  try{await sb.rpc('nzila_mark_notification_read',{p_notification_id:id})}catch{}
+  const offer=await nzdLoadPendingOffer();
+  if(offer){renderOfferFromRide();$('offerSection').classList.remove('hidden');openPage('home');return;}
+  toast('Cette notification ne correspond plus à une course disponible.');
+  loadNotifications();
+}
+
+async function loadNotifications(){
+  const e=document.querySelector('#notificationsPage .list');
+  if(!e||!current?.id)return;
+  const {data,error}=await sb.from('notifications').select('*').eq('user_id',current.id).order('created_at',{ascending:false}).limit(50);
+  if(error){e.innerHTML='<div class="card">Notifications indisponibles : '+esc(error.message)+'</div>';return;}
+  e.innerHTML=data?.length?data.map(x=>{
+    const isCourse=String(x.title||'').toLowerCase().includes('course')||String(x.message||x.body||'').toLowerCase().includes('course');
+    return '<button class="listItem" style="width:100%;text-align:left" onclick="openNotification(\''+x.id+'\')">'+
+      '<div><b>'+esc(x.title)+'</b><small>'+esc(x.message||x.body||'')+'</small>'+
+      (isCourse?'<small style="color:var(--green);font-weight:800;margin-top:7px">🚕 Voir la course · Accepter / Refuser</small>':'')+
+      '</div><span>'+(x.is_read?'':'🔔')+'</span></button>';
+  }).join(''):'<div class="card">Aucune notification.</div>';
+}
+
+async function renderRides(){
+  if(!current?.id)return;
+  const {data:offers}=await sb.from('ride_offers').select('*').eq('driver_id',current.id).eq('status','pending').order('created_at',{ascending:false}).limit(20);
+  const {data:rides}=await sb.from('rides').select('*').eq('driver_id',current.id).order('created_at',{ascending:false}).limit(50);
+  const pending=[];
+  for(const o of (offers||[])){
+    const {data:r}=await sb.from('rides').select('*').eq('id',o.ride_id).maybeSingle();
+    if(r)pending.push({offer:o,ride:r});
+  }
+  let html='';
+  if(pending.length){
+    html+=pending.map(x=>{
+      const r=x.ride;
+      const price=money(r.final_price??r.estimated_price??0);
+      const distance=x.offer.distance_km!=null?Number(x.offer.distance_km).toFixed(1)+' km':(r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—');
+      return '<button class="listItem" style="width:100%;text-align:left" onclick="openPendingOffer()"><div><b>🚕 Nouvelle course #'+String(r.id).slice(0,8)+'</b><small>'+esc(r.pickup_address||'Prise en charge')+' → '+esc(r.destination_address||'Destination')+' · '+distance+'</small><small style="color:var(--green);font-weight:800;margin-top:6px">DISPONIBLE · Voir détails / Accepter / Refuser</small></div><span class="amount">'+price+'</span></button>';
+    }).join('');
+  }
+  if(rides?.length){
+    html+=(pending.length?'<div style="height:10px"></div>':'')+rides.map(r=>'<button class="listItem" style="width:100%;text-align:left" onclick="openRideFromHistory(\''+r.id+'\')"><div><b>Course #'+String(r.id).slice(0,8)+'</b><small>'+esc(r.pickup_address||'Prise en charge')+' → '+esc(r.destination_address||'Destination')+' · '+esc(labelStatus(r.status))+'</small></div><span class="amount">'+money(r.final_price??r.estimated_price)+'</span></button>').join('');
+  }
+  if(!html)html='<div class="card">Aucune course disponible ou synchronisée.</div>';
+  $('recentRides').innerHTML=html;$('allRides').innerHTML=html;
+}
+
+async function openRideFromHistory(rideId){
+  const {data:r,error}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+  if(error||!r)return toast('Impossible de charger cette course.');
+  currentRide={id:r.id,pickup:r.pickup_address||'Point de prise en charge',destination:r.destination_address||'Destination',price:Number(r.final_price??r.estimated_price??0),distance:r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—',db:r,offer_id:null};
+  if(['accepted','driver_arriving','arrived','in_progress'].includes(r.status)){
+    rideState=r.status==='arrived'?'arrived':r.status==='in_progress'?'in_progress':'accepted';
+    renderRidePage();openPage('ride');
+  }else toast('Cette course n’est plus active.');
+}
+
+async function acceptOffer(){
+  if(!currentRide)return toast('Aucune course disponible.');
+  const rideId=currentRide.id;
+  const {data,error}=await sb.rpc('nzila_driver_accept_ride',{p_ride_id:rideId,p_driver_id:current.id});
+  if(error)return toast('Impossible d’accepter : '+nzdErr(error));
+  activeOffer=null;
+  const {data:r}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+  if(r)currentRide={...currentRide,db:r,pickup:r.pickup_address||currentRide.pickup,destination:r.destination_address||currentRide.destination,price:Number(r.final_price??r.estimated_price??currentRide.price)};
+  rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');renderRides();toast('Course acceptée.');
+}
+
+async function rejectOffer(){
+  if(!currentRide)return toast('Aucune course disponible.');
+  const rideId=currentRide.id;
+  const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:rideId,p_driver_id:current.id});
+  if(error)return toast('Impossible de refuser : '+nzdErr(error));
+  activeOffer=null;currentRide=null;$('offerSection').classList.add('hidden');await renderRides();toast('Course refusée.');
+}
+
+async function openAppOfferSync(){if(online){await subscribeDriverOffers();await nzdLoadPendingOffer();}}
+
+setTimeout(()=>{if(typeof nzdRestore==='function'){}},0);
+</script>
+
 </body>
 </html>

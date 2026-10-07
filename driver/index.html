@@ -507,10 +507,6 @@ async function acceptOffer(){
     if(re)throw re;
     if(!r)throw new Error('COURSE_INTROUVABLE_APRES_ACCEPTATION');
 
-    /* Notification officielle au client. */
-    const notify=await sb.rpc('nzila_notify_driver_found',{p_ride_id:rideId});
-    if(notify.error)console.warn('Notification client:',notify.error.message);
-
     activeOffer=null;
     currentRide={
       ...currentRide,
@@ -548,6 +544,7 @@ async function rejectOffer(){
     $('offerSection').classList.add('hidden');
     await renderRides();
     loadNotifications();
+    setTimeout(()=>loadPendingOffers(),300);
     toast('Course refusée. Elle peut être proposée à un autre chauffeur.');
   }catch(e){
     console.error('NZILA rejectOffer:',e);

@@ -28,6 +28,20 @@
 .doc{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line)}.doc:last-child{border:0}.doc b{font-size:14px}.doc small{display:block;color:var(--muted);margin-top:3px}
 .chart{height:180px;display:flex;align-items:end;gap:10px;padding-top:15px}.barWrap{height:100%;flex:1;display:flex;align-items:end;justify-content:center;gap:3px}.bar{width:70%;max-width:35px;border-radius:7px 7px 2px 2px;background:#0b8f55}.barLabel{font-size:10px;color:var(--muted);text-align:center;margin-top:6px}
 .modal{position:fixed;inset:0;background:rgba(16,24,40,.55);z-index:100;display:none;align-items:end;justify-content:center}.modal.show{display:flex}.sheet{background:#fff;width:min(600px,100%);border-radius:25px 25px 0 0;padding:22px;max-height:90vh;overflow:auto}.sheet h2{margin:0 0 8px}.close{float:right;background:#f2f4f7;border-radius:10px;width:36px;height:36px}.sos{background:#991b1b;color:#fff}
+
+.notifCourse{display:block;width:100%;background:#fff;border:2px solid #b9ead3;border-radius:18px;padding:16px;margin-bottom:10px;text-align:left;box-shadow:0 8px 24px rgba(16,24,40,.08)}
+.notifCourse.unread{border-color:#0b8f55}
+.notifCourseTitle{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.notifCourseTitle b{font-size:15px}
+.notifCourseMessage{color:#667085;font-size:12px;line-height:1.45;margin:7px 0 12px}
+.notifCourseActions{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
+.courseBtn{height:44px;border-radius:11px;font-weight:800;border:1px solid #d0d5dd;padding:0 10px;cursor:pointer}
+.courseBtn.details{background:#111827;color:#fff;border-color:#111827}
+.courseBtn.accept{background:#0b8f55;color:#fff;border-color:#0b8f55}
+.courseBtn.reject{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.courseBtn:disabled{opacity:.6;cursor:wait}
+@media(max-width:520px){.notifCourseActions{grid-template-columns:1fr}.courseBtn{height:46px}}
+
 .toast{position:fixed;left:50%;bottom:92px;transform:translate(-50%,20px);opacity:0;background:#111827;color:#fff;padding:12px 16px;border-radius:12px;z-index:120;font-size:13px;transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
 @media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.map{height:290px}.hero h1{font-size:25px}}
 @media(max-width:520px){.wrap{padding:14px 12px 100px}.top{padding:0 12px}.grid2{grid-template-columns:1fr}.cards{gap:8px}.metric{padding:13px}.metric b{font-size:18px}.hero{border-radius:20px}.hero p{font-size:13px}.two{gap:10px}.bottom{height:72px}.nav{width:24vw}}
@@ -111,7 +125,7 @@
         <div><div class="routeText"><small>PRISE EN CHARGE</small><b>Bacongo — Pharmacie</b></div><div class="routeText"><small>DESTINATION</small><b>Centre-ville</b></div></div>
       </div>
       <div class="muted" style="font-size:12px;margin-bottom:12px">👤 2 passagers · 6,2 km estimés</div>
-      <div class="grid2"><button class="btn outline" onclick="rejectOffer()">Refuser</button><button class="btn primary" onclick="acceptOffer()">Accepter</button></div>
+      <div class="grid2"><button class="btn dark" onclick="openPage('ride')">📋 Détails de la course</button><button class="btn primary" onclick="acceptOffer()">✓ Accepter la course</button></div><button class="btn danger wide" style="margin-top:8px" onclick="rejectOffer()">✕ Refuser la course</button>
     </div>
   </div>
 
@@ -359,7 +373,7 @@ function renderOfferFromRide(){if(!currentRide)return;const card=document.queryS
 function showOffer(){if(online&&!currentRide){$('offerSection').classList.remove('hidden');toast('Nouvelle course disponible')}}
 async function rejectOffer(){if(!currentRide)return;$('offerSection').classList.add('hidden');if(isUuid(current.id)&&isUuid(currentRide.id)){const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:currentRide.id,p_driver_id:current.id});if(error)return toast('Impossible de refuser : '+error.message)}currentRide=null;toast('Course refusée.')}
 async function acceptOffer(){if(!currentRide)return toast('Aucune course disponible.');rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée.')}
-function renderRidePage(){$('rideTitle').textContent='Course #'+String(currentRide?.id||'').slice(0,8);$('pickup').textContent=currentRide?.pickup||'—';$('destination').textContent=currentRide?.destination||'—';$('ridePrice').textContent=money(currentRide?.price);$('rideDistance').textContent=currentRide?.distance||'—';const state=$('rideState');state.textContent=rideState==='accepted'?'EN ROUTE':rideState==='arrived'?'ARRIVÉ':rideState==='in_progress'?'EN COURS':'TERMINÉ';state.className='badge '+(rideState==='accepted'?'orange':'green');$('arrivedBtn').classList.toggle('hidden',rideState!=='accepted');$('startTripBtn').classList.toggle('hidden',rideState!=='arrived');$('finishBtn').classList.toggle('hidden',rideState!=='in_progress');setTimeout(()=>rideMap&&rideMap.invalidateSize(),150)}
+function renderRidePage(){$('rideTitle').textContent='Course #'+String(currentRide?.id||'').slice(0,8);$('pickup').textContent=currentRide?.pickup||'—';$('destination').textContent=currentRide?.destination||'—';$('ridePrice').textContent=money(currentRide?.price);$('rideDistance').textContent=currentRide?.distance||'—';const state=$('rideState');state.textContent=rideState==='requested'?'NOUVELLE COURSE':rideState==='accepted'?'EN ROUTE':rideState==='arrived'?'ARRIVÉ':rideState==='in_progress'?'EN COURS':'TERMINÉ';state.className='badge '+(rideState==='accepted'?'orange':'green');$('arrivedBtn').classList.toggle('hidden',rideState!=='accepted');$('startTripBtn').classList.toggle('hidden',rideState!=='arrived');$('finishBtn').classList.toggle('hidden',rideState!=='in_progress');setTimeout(()=>rideMap&&rideMap.invalidateSize(),150)}
 async function arrived(){if(!currentRide)return;const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'arrived'});if(error)return toast(error.message);rideState='arrived';renderRidePage();showModal('<h2>Vous êtes arrivé</h2><p class="muted">Demandez au client son code NZILA à 4 chiffres avant de démarrer la course.</p><div class="field"><input id="code" class="input" maxlength="4" inputmode="numeric" placeholder="Code client"></div><button class="btn primary wide" style="margin-top:10px" onclick="verifyCode()">Valider le client</button>')}
 async function verifyCode(){const c=val('code');if(c.length!==4)return toast('Entrez le code à 4 chiffres.');closeModal();const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'in_progress'});if(error)return toast(error.message);rideState='in_progress';renderRidePage();toast('Client confirmé. Bonne course !')}
 async function startTrip(){if(!currentRide)return;const {error}=await sb.rpc('nzila_update_ride_status',{p_ride_id:currentRide.id,p_status:'in_progress'});if(error)return toast(error.message);rideState='in_progress';renderRidePage();toast('Course démarrée')}
@@ -370,8 +384,162 @@ async function withdraw(){toast('Le portefeuille est connecté. Le retrait Mobil
 function saveCurrent(){localStorage.setItem(SESSION,JSON.stringify(current))}
 function renderProfile(){$('profileName').textContent=((current?.first_name||'')+' '+(current?.last_name||'')).trim()||'Chauffeur NZILA';$('profileRating').textContent=Number(current?.rating||5).toFixed(2).replace('.',',');$('profileRides').textContent=current?.total_rides||0;$('avatar').textContent=((current?.first_name||'N')[0]+(current?.last_name||'Z')[0]).toUpperCase();$('pFirst').value=current?.first_name||'';$('pLast').value=current?.last_name||'';$('pPhone').value=(current?.phone||'').replace('+242','');$('vMake').value=current?.vehicle_make||'';$('vModel').value=current?.vehicle_model||'';$('vPlate').value=current?.vehicle_plate||'';$('vColor').value=current?.vehicle_color||''}
 async function saveProfile(){const first=val('pFirst'),last=val('pLast'),phone=normalizePhone(val('pPhone'));if(!first||!last||!phone)return toast('Prénom, nom et téléphone sont requis.');const {data,error}=await sb.rpc('nzila_update_driver_profile_app',{p_user_id:current.id,p_first_name:first,p_last_name:last,p_phone:phone,p_vehicle_make:val('vMake'),p_vehicle_model:val('vModel'),p_vehicle_plate:val('vPlate'),p_vehicle_color:val('vColor')});if(error)return toast('Profil non enregistré : '+error.message);current={...current,...data,vehicle_make:val('vMake'),vehicle_model:val('vModel'),vehicle_plate:val('vPlate'),vehicle_color:val('vColor')};saveCurrent();renderProfile();toast('Profil enregistré dans NZILA')}
-async function loadNotifications(){const e=document.querySelector('#notificationsPage .list');const {data,error}=await sb.from('notifications').select('*').eq('user_id',current.id).order('created_at',{ascending:false}).limit(50);if(error){e.innerHTML='<div class="card">Notifications indisponibles : '+esc(error.message)+'</div>';return}e.innerHTML=data?.length?data.map(x=>'<button class="listItem" style="width:100%;text-align:left" onclick="readNotification(\''+x.id+'\')"><div><b>'+esc(x.title)+'</b><small>'+esc(x.message)+'</small></div><span>'+(x.is_read?'':'🔔')+'</span></button>').join(''):'<div class="card">Aucune notification.</div>'}
-async function readNotification(id){const {error}=await sb.rpc('nzila_mark_notification_read',{p_notification_id:id});if(error)toast(error.message);else loadNotifications()}
+async function getNotificationRideContext(n){
+  let rideId = n?.ride_id || n?.rideId || null;
+  let offerId = n?.offer_id || n?.offerId || null;
+
+  for(const key of ['data','metadata','payload']){
+    const v=n?.[key];
+    if(v){
+      try{
+        const o=typeof v==='string'?JSON.parse(v):v;
+        rideId=rideId||o?.ride_id||o?.rideId||o?.ride?.id||null;
+        offerId=offerId||o?.offer_id||o?.offerId||o?.offer?.id||null;
+      }catch{}
+    }
+  }
+
+  if(offerId){
+    const {data:o}=await sb.from('ride_offers').select('*').eq('id',offerId).maybeSingle();
+    if(o) return {offer:o,rideId:o.ride_id};
+  }
+
+  if(rideId){
+    const {data:r}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+    if(r) return {ride:r,rideId};
+  }
+
+  // Fallback: the notification is a new ride notification, so use the
+  // driver's most recent pending offer. This also works when the notification
+  // row itself has no ride_id column.
+  const {data:offers}=await sb.from('ride_offers')
+    .select('*')
+    .eq('driver_id',current.id)
+    .eq('status','pending')
+    .order('created_at',{ascending:false})
+    .limit(5);
+
+  const o=offers?.[0];
+  if(o){
+    const {data:r}=await sb.from('rides').select('*').eq('id',o.ride_id).maybeSingle();
+    if(r) return {offer:o,ride:r,rideId:r.id};
+  }
+  return null;
+}
+
+async function markNotificationReadSafe(id){
+  if(!id)return;
+  // The old RPC is absent in the current database. Marking read is optional
+  // for opening a course, so never block the course action on it.
+  try{
+    await sb.from('notifications').update({is_read:true}).eq('id',id);
+  }catch{}
+}
+
+async function prepareNotificationRide(notificationId){
+  const {data:n,error}=await sb.from('notifications').select('*').eq('id',notificationId).maybeSingle();
+  if(error)throw error;
+  const ctx=await getNotificationRideContext(n);
+  if(!ctx?.ride)throw new Error('La course n’est plus disponible.');
+  const r=ctx.ride;
+  activeOffer=ctx.offer||null;
+  currentRide={
+    id:r.id,
+    pickup:r.pickup_address||'Point de prise en charge',
+    destination:r.destination_address||'Destination',
+    price:Number(r.final_price??r.estimated_price??0),
+    distance:r.estimated_distance?Number(r.estimated_distance).toFixed(1)+' km':'—',
+    db:r,
+    offer_id:ctx.offer?.id||null
+  };
+  rideState='requested';
+  renderOfferFromRide();
+  $('offerSection').classList.remove('hidden');
+  await markNotificationReadSafe(notificationId);
+  return ctx;
+}
+
+async function openNotification(notificationId){
+  try{
+    await prepareNotificationRide(notificationId);
+    openPage('home');
+    $('offerSection')?.scrollIntoView({behavior:'smooth',block:'start'});
+    toast('🚕 Détails de la course affichés.');
+  }catch(e){
+    toast('Impossible d’ouvrir la course : '+nzdErr(e));
+  }
+}
+
+async function acceptNotificationCourse(notificationId,btn){
+  if(btn)btn.disabled=true;
+  try{
+    await prepareNotificationRide(notificationId);
+    await acceptOffer();
+  }catch(e){
+    toast('Impossible d’accepter la course : '+nzdErr(e));
+    if(btn)btn.disabled=false;
+  }
+}
+
+async function rejectNotificationCourse(notificationId,btn){
+  if(btn)btn.disabled=true;
+  try{
+    await prepareNotificationRide(notificationId);
+    await rejectOffer();
+  }catch(e){
+    toast('Impossible de refuser la course : '+nzdErr(e));
+    if(btn)btn.disabled=false;
+  }
+}
+
+async function loadNotifications(){
+  const e=document.querySelector('#notificationsPage .list');
+  if(!e||!current?.id)return;
+
+  const {data,error}=await sb.from('notifications')
+    .select('*')
+    .eq('user_id',current.id)
+    .order('created_at',{ascending:false})
+    .limit(50);
+
+  if(error){
+    e.innerHTML='<div class="card">Notifications indisponibles : '+esc(error.message)+'</div>';
+    return;
+  }
+
+  if(!data?.length){
+    e.innerHTML='<div class="card">Aucune notification.</div>';
+    return;
+  }
+
+  e.innerHTML=data.map(x=>{
+    const id=String(x.id);
+    const title=esc(x.title||'Nouvelle notification');
+    const message=esc(x.message||x.body||'');
+    const unread=!x.is_read;
+    return `
+      <div class="notifCourse ${unread?'unread':''}">
+        <div class="notifCourseTitle">
+          <b>${title}</b>
+          <span>${unread?'🔔':'✓'}</span>
+        </div>
+        <div class="notifCourseMessage">${message}</div>
+        <div class="notifCourseActions">
+          <button class="courseBtn details" onclick="openNotification('${id}')">📋 Détails de la course</button>
+          <button class="courseBtn accept" onclick="acceptNotificationCourse('${id}',this)">✓ Accepter la course</button>
+          <button class="courseBtn reject" onclick="rejectNotificationCourse('${id}',this)">✕ Refuser la course</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Kept for compatibility with any older UI call.
+// It no longer calls the missing nzila_mark_notification_read RPC.
+async function readNotification(id){
+  await markNotificationReadSafe(id);
+  await loadNotifications();
+}
+
 function subscribeNotifications(){if(!isUuid(current?.id))return;if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};notificationChannel=sb.channel('driver-notifications-'+current.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+current.id},p=>{toast('🔔 '+(p.new.title||'Nouvelle notification'));loadNotifications()}).subscribe()}
 async function showSOS(){try{const p=await getCurrentPosition();const {data,error}=await sb.rpc('nzila_trigger_sos',{p_user_id:current.id,p_ride_id:isUuid(currentRide?.id)?currentRide.id:null,p_type:'emergency',p_latitude:p.coords.latitude,p_longitude:p.coords.longitude,p_accuracy:p.coords.accuracy||null,p_message:'SOS chauffeur NZILA'});if(error)throw error;toast('🆘 Alerte SOS transmise à NZILA.')}catch(e){toast('SOS : '+(e.message||'échec de transmission'))}showModal('<h2 style="color:#991b1b">🆘 Urgence</h2><p class="muted">Votre alerte a été enregistrée. Utilisez aussi les services d’urgence locaux si nécessaire.</p><button class="btn sos wide" style="margin-top:8px" onclick="closeModal()">Fermer</button>')}
 function getCurrentPosition(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('GPS indisponible'));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000});});}
@@ -428,20 +596,37 @@ function renderOfferFromRide(){
   const meta=card.querySelector('.muted[style*="margin-bottom"]');if(meta)meta.textContent='Course NZILA · '+currentRide.distance+' estimés';
 }
 async function rejectOffer(){
-  if(!currentRide)return;
-  const rideId=currentRide.id;$('offerSection').classList.add('hidden');
-  const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:rideId,p_driver_id:current.id});
-  if(error){$('offerSection').classList.remove('hidden');return toast('Impossible de refuser : '+nzdErr(error))}
-  currentRide=null;toast('Course refusée.');
+  if(!currentRide)return toast('Aucune course disponible.');
+  const rideId=currentRide.id;
+  try{
+    const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:rideId,p_driver_id:current.id});
+    if(error)throw error;
+    $('offerSection').classList.add('hidden');
+    currentRide=null;
+    activeOffer=null;
+    toast('✓ Course refusée.');
+    renderRides();
+  }catch(e){
+    toast('Impossible de refuser : '+nzdErr(e));
+  }
 }
 async function acceptOffer(){
   if(!currentRide)return toast('Aucune course disponible.');
   const rideId=currentRide.id;
-  const {data,error}=await sb.rpc('nzila_driver_accept_ride',{p_ride_id:rideId,p_driver_id:current.id});
-  if(error)return toast('Impossible d’accepter : '+nzdErr(error));
-  const {data:r}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
-  if(r)currentRide={...currentRide,db:r,pickup:r.pickup_address,destination:r.destination_address,price:Number(r.final_price??r.estimated_price??0)};
-  rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');toast('Course acceptée.');
+  try{
+    const {error}=await sb.rpc('nzila_driver_accept_ride',{p_ride_id:rideId,p_driver_id:current.id});
+    if(error)throw error;
+    const {data:r,error:re}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+    if(re)throw re;
+    if(r)currentRide={...currentRide,db:r,pickup:r.pickup_address||currentRide.pickup,destination:r.destination_address||currentRide.destination,price:Number(r.final_price??r.estimated_price??currentRide.price)};
+    rideState='accepted';
+    $('offerSection').classList.add('hidden');
+    renderRidePage();
+    openPage('ride');
+    toast('✓ Course acceptée.');
+  }catch(e){
+    toast('Impossible d’accepter : '+nzdErr(e));
+  }
 }
 async function arrived(){
   if(!currentRide)return;

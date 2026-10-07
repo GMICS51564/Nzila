@@ -120,7 +120,7 @@
         <div><div class="routeText"><small>PRISE EN CHARGE</small><b>Bacongo — Pharmacie</b></div><div class="routeText"><small>DESTINATION</small><b>Centre-ville</b></div></div>
       </div>
       <div class="muted" style="font-size:12px;margin-bottom:12px">👤 2 passagers · 6,2 km estimés</div>
-      <div class="grid2"><button class="btn dark" onclick="openPage('ride')">📋 Détails de la course</button><button class="btn primary" onclick="acceptOffer()">✓ Accepter la course</button></div><button class="btn danger wide" style="margin-top:8px" onclick="rejectOffer()">✕ Refuser la course</button>
+      <button class="btn primary wide" onclick="acceptOffer()">✓ Accepter la course</button><button class="btn danger wide" style="margin-top:8px" onclick="confirmRejectOffer()">✕ Refuser la course</button>
     </div>
   </div>
 
@@ -410,9 +410,23 @@ async function acceptNotificationCourse(id,btn){
   catch(e){console.error('NZILA accept notification:',e);toast('Impossible d’accepter : '+String(e.message||e));if(btn)btn.disabled=false}
 }
 async function rejectNotificationCourse(id,btn){
-  if(btn)btn.disabled=true;
-  try{await prepareNotificationRide(id);await rejectOffer()}
-  catch(e){console.error('NZILA reject notification:',e);toast('Impossible de refuser : '+String(e.message||e));if(btn)btn.disabled=false}
+  try{
+    await prepareNotificationRide(id);
+    if(!currentRide)return;
+    const amount=money(currentRide.price||0);
+    const ok=window.confirm(
+      'Êtes-vous bien sûr de refuser cette course ?\\n\\n'+
+      'Vous auriez pu gagner '+amount+'.\\n\\n'+
+      'Le refus ne sera pas communiqué au client et la course pourra être proposée à un autre chauffeur.'
+    );
+    if(!ok)return;
+    if(btn)btn.disabled=true;
+    await rejectOffer();
+  }catch(e){
+    console.error('NZILA reject notification:',e);
+    toast('Impossible de refuser la course : '+String(e.message||e));
+    if(btn)btn.disabled=false;
+  }
 }
 async function loadNotifications(){
   const e=document.querySelector('#notificationsPage .list');if(!e||!current?.id)return;
@@ -467,25 +481,78 @@ async function renderRides(){
 }
 
 
+
+function confirmRejectOffer(){
+  if(!currentRide)return toast('Aucune course disponible.');
+  const amount=money(currentRide.price||0);
+  const ok=window.confirm(
+    'Êtes-vous bien sûr de refuser cette course ?\n\n' +
+    'Vous auriez pu gagner '+amount+'.\n\n' +
+    'Le refus ne sera pas communiqué au client et la course pourra être proposée à un autre chauffeur.'
+  );
+  if(ok)rejectOffer();
+}
+
 async function acceptOffer(){
   if(!currentRide)return toast('Aucune course disponible.');
   const rideId=currentRide.id;
   try{
-    const {data,error}=await sb.rpc('nzila_driver_accept_ride',{p_ride_id:rideId,p_driver_id:current.id});if(error)throw error;
+    const {error}=await sb.rpc('nzila_driver_accept_ride',{
+      p_ride_id:rideId,
+      p_driver_id:current.id
+    });
+    if(error)throw error;
+
+    const {data:r,error:re}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
+    if(re)throw re;
+    if(!r)throw new Error('COURSE_INTROUVABLE_APRES_ACCEPTATION');
+
+    /* Notification officielle au client. */
+    const notify=await sb.rpc('nzila_notify_driver_found',{p_ride_id:rideId});
+    if(notify.error)console.warn('Notification client:',notify.error.message);
+
     activeOffer=null;
-    const {data:r,error:re}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();if(re)throw re;
-    if(r)currentRide={...currentRide,db:r,pickup:r.pickup_address||currentRide.pickup,destination:r.destination_address||currentRide.destination,price:Number(r.final_price??r.estimated_price??currentRide.price)};
-    rideState='accepted';$('offerSection').classList.add('hidden');renderRidePage();openPage('ride');await renderRides();loadNotifications();toast('Course acceptée.');
-  }catch(e){console.error('NZILA acceptOffer:',e);toast('Impossible d’accepter : '+String(e.message||e))}
+    currentRide={
+      ...currentRide,
+      db:r,
+      pickup:r.pickup_address||currentRide.pickup,
+      destination:r.destination_address||currentRide.destination,
+      price:Number(r.final_price??r.estimated_price??currentRide.price)
+    };
+    rideState='accepted';
+    $('offerSection').classList.add('hidden');
+    renderRidePage();
+    openPage('ride');
+    await renderRides();
+    loadNotifications();
+    toast('✓ Course acceptée. Le client a été informé.');
+  }catch(e){
+    console.error('NZILA acceptOffer:',e);
+    toast('Impossible d’accepter la course : '+String(e.message||e));
+  }
 }
 
 async function rejectOffer(){
   if(!currentRide)return toast('Aucune course disponible.');
   const rideId=currentRide.id;
   try{
-    const {error}=await sb.rpc('nzila_driver_reject_ride',{p_ride_id:rideId,p_driver_id:current.id});if(error)throw error;
-    activeOffer=null;currentRide=null;$('offerSection').classList.add('hidden');await renderRides();loadNotifications();toast('Course refusée.');
-  }catch(e){console.error('NZILA rejectOffer:',e);toast('Impossible de refuser : '+String(e.message||e))}
+    const {error}=await sb.rpc('nzila_driver_reject_ride',{
+      p_ride_id:rideId,
+      p_driver_id:current.id
+    });
+    if(error)throw error;
+
+    /* Refus de l'offre uniquement : le client n'est pas notifié. */
+    activeOffer=null;
+    currentRide=null;
+    $('offerSection').classList.add('hidden');
+    await renderRides();
+    loadNotifications();
+    toast('Course refusée. Elle peut être proposée à un autre chauffeur.');
+  }catch(e){
+    console.error('NZILA rejectOffer:',e);
+    toast('Impossible de refuser la course : '+String(e.message||e));
+  }
 }
 
 async function openAppOfferSync(){if(online){subscribeDriverOffers();await loadPendingOffers();}}

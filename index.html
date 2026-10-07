@@ -296,6 +296,7 @@ async function createRide(){
   if(error)return toast('Impossible de créer la course : '+error.message);
   const rideId=data?.ride_id||data?.id;if(!rideId)return toast('Course créée mais identifiant introuvable.');
   activeRideId=rideId;
+  startRideSync(rideId);
   const match=await sb.rpc('nzila_match_ride',{p_ride_id:rideId});
   if(match.error)console.warn('Matching NZILA:',match.error.message);
   const {data:ride}=await sb.from('rides').select('*').eq('id',rideId).maybeSingle();
@@ -312,7 +313,7 @@ function labelStatus(s){return({requested:'Demande créée',searching:'Recherche
 function showRideModal(r){$('rideModalTitle').textContent=labelStatus(r.status);$('rideBox').innerHTML='<strong>'+esc(r.pickup_address)+' → '+esc(r.destination_address)+'</strong><br><span class="muted">'+labelStatus(r.status)+'</span>';$('rideModalBtn').textContent=r.status==='completed'?'Voir mes trajets':'Fermer';$('rideModal').classList.add('show')}
 function closeRideModal(){if($('rideModalBtn').textContent==='Voir mes trajets'){closeRideModal.active=false;openPage('completed')}$('rideModal').classList.remove('show')}
 function subscribeRides(){if(!user?.id)return;if(rideChannel)try{sb.removeChannel(rideChannel)}catch{};rideChannel=sb.channel('client-rides-'+user.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'rides',filter:'user_id=eq.'+user.id},async p=>{if(p.new.id===activeRideId)showRideModal(p.new);if(p.new.status==='accepted')await ensureRidePayment(p.new);if(p.new.status==='completed'){toast('Votre course est terminée.');loadHistory()}}).subscribe()}
-function subscribeToRide(id){activeRideId=id}
+function subscribeToRide(id){activeRideId=id;startRideSync(id)}
 function subscribeNotifications(){if(!user?.id)return;if(notificationChannel)try{sb.removeChannel(notificationChannel)}catch{};notificationChannel=sb.channel('client-notifications-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+user.id},p=>{toast('🔔 '+(p.new.title||'Nouvelle notification'));loadNotifications()}).subscribe()}
 async function loadHistory(){const el=$('history');const {data,error}=await sb.from('rides').select('*').eq('user_id',user.id).order('created_at',{ascending:false});if(error){el.innerHTML='<div class="card" style="padding:18px">Aucun historique synchronisé pour le moment.</div>';return}el.innerHTML=data?.length?data.map(r=>'<div class="card historycard"><div class="histtop"><span class="muted">'+new Date(r.created_at).toLocaleDateString('fr-FR')+'</span><b>'+money(r.final_price??r.estimated_price)+'</b></div><div class="route"><div class="rline"><i></i><span></span><i></i></div><div class="rtext">'+esc(r.pickup_address)+'<br>'+esc(r.destination_address)+'<br><span class="muted">'+labelStatus(r.status)+'</span></div></div>'+(r.status==='completed'?'<button class="outline" style="margin-top:12px" onclick="rateRide(\''+r.id+'\')">Noter le trajet</button>':'')+'</div>').join(''):'<div class="card" style="padding:22px;text-align:center">🛣️<br><b>Aucun trajet</b><p class="muted">Vos courses apparaîtront ici.</p></div>'}
 async function rateRide(id){const rating=prompt('Note de 1 à 5 :');if(!rating||!Number.isInteger(+rating)||+rating<1||+rating>5)return;const comment=prompt('Commentaire (facultatif)')||'';const {error}=await sb.from('ride_ratings').insert({ride_id:id,user_id:user.id,rating:+rating,comment});toast(error?'Avis non synchronisé : '+error.message:'Merci pour votre avis ⭐')}
@@ -413,6 +414,26 @@ function closeRideModal(){
   if($('rideModalBtn').textContent==='Voir mes trajets')openPage('completed');
   $('rideModal').classList.remove('show');
 }
+let rideSyncTimer=null;
+function startRideSync(id){
+  if(rideSyncTimer)clearInterval(rideSyncTimer);
+  if(!id||!user?.id)return;
+  const sync=async()=>{
+    const {data:r,error}=await sb.from('rides').select('*').eq('id',id).eq('user_id',user.id).maybeSingle();
+    if(error||!r)return;
+    if(r.status==='accepted'||r.status==='driver_arriving'||r.status==='arrived'||r.status==='in_progress'||r.status==='completed'){
+      showRideModal(r);
+      await loadNotifications();
+      if(r.status==='accepted'||r.status==='driver_arriving')await ensureRidePayment(r);
+    }
+    if(['completed','cancelled'].includes(r.status)){
+      clearInterval(rideSyncTimer);rideSyncTimer=null;loadHistory();
+    }
+  };
+  sync();
+  rideSyncTimer=setInterval(sync,2000);
+}
+
 function subscribeToRide(id){
   if(!id)return;
   if(rideChannel)try{sb.removeChannel(rideChannel)}catch{}

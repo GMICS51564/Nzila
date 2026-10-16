@@ -71,20 +71,6 @@
 <nav class="bottom"><button class="nav active" data-page="home" onclick="openPage('home')"><div class="navicon">⌂</div>Accueil</button><button class="nav" data-page="services" onclick="openPage('services')"><div class="navicon">◈</div>Services</button><button class="nav" data-page="completed" onclick="openPage('completed')"><div class="navicon">✓</div>Terminés</button><button class="nav" data-page="account" onclick="openPage('account')"><div class="navicon">●</div>Compte</button></nav>
 </div>
 
- <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">COURSE</div><h1>Suivi en direct</h1></div></div>
- <div class="card"><div id="trackStatus" class="badge orange">Aucune course active</div><h2 id="trackTitle">—</h2><p id="trackRoute" class="muted">—</p><div id="trackDriver" class="routebox">En attente des informations chauffeur.</div><div id="trackMap" style="height:260px;border-radius:16px;margin-top:12px"></div><div class="row" style="margin-top:12px"><button class="btn primary" onclick="refreshTracking()">Actualiser</button><button class="btn danger" onclick="cancelActiveRide()">Annuler</button></div></div>
-</section>
-
- <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">PROTECTION</div><h1>Sécurité</h1></div></div>
- <div class="card"><h3>Urgence</h3><p class="muted">En cas de danger réel, utilisez également les services d'urgence locaux.</p><button class="btn danger wide" onclick="triggerClientSOS()">🆘 Déclencher un SOS</button></div>
- <div class="card"><h3>Position</h3><p id="securityGps" class="muted">Position non vérifiée.</p><button class="btn wide" onclick="checkSecurityGPS()">Partager ma position</button></div>
- <div class="card"><h3>Contact d'urgence</h3><input id="plusEmergencyName" class="input" placeholder="Nom"><input id="plusEmergencyPhone" class="input" placeholder="Téléphone"><button class="btn primary wide" onclick="savePlusEmergency()">Enregistrer</button></div>
-</section>
-<section class="page" id="preferencesPage">
- <div class="top"><button class="btn" onclick="openPage('nzilaPlus')">← Retour</button><div><div class="eyebrow">APPLICATION</div><h1>Préférences</h1></div></div>
- <div class="card"><label class="item"><span>🔔 Notifications</span><input id="prefNotif" type="checkbox" checked onchange="savePrefs()"></label><label class="item"><span>📍 GPS haute précision</span><input id="prefGps" type="checkbox" checked onchange="savePrefs()"></label><label class="item"><span>📳 Confirmation avant actions sensibles</span><input id="prefConfirm" type="checkbox" checked onchange="savePrefs()"></label></div>
- <div class="card"><h3>Version</h3><p class="muted">NZILA Client — fonctionnalités avancées.</p><button class="btn wide" onclick="toast('Application prête.')">Vérifier l'état</button></div>
-</section>
 <div id="rideModal" class="modal"><div class="sheet"><div class="handle"></div><h3 id="rideModalTitle">Recherche en cours</h3><p id="rideModalText">Nous transmettons votre demande au réseau NZILA.</p><div id="rideBox" class="routebox"></div><button class="primary" id="rideModalBtn" onclick="closeRideModal()">Fermer</button></div></div>
 <div id="toast" class="toast"></div>
 <!-- NZILA — Supabase -->
